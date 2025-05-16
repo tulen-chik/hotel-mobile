@@ -1,0 +1,29 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "rooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isOccupied", "order": "ASCENDING" },
+        { "fieldPath": "number", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "cleaning_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "roomId", "order": "ASCENDING" },
+        { "fieldPath": "cleanedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "cleaning_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "cleanerId", "order": "ASCENDING" },
+        { "fieldPath": "cleanedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+} 
