@@ -1,5 +1,7 @@
-import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
-import { Database, getDatabase } from 'firebase/database';
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getDatabase } from 'firebase/database';
+import { initializeFirebaseSchemas } from './schemas';
 
 // Конфигурация Firebase
 const firebaseConfig = {
@@ -11,16 +13,24 @@ const firebaseConfig = {
     messagingSenderId: "1082785459044",
     appId: "1:1082785459044:web:70755f73715cff26486871",
     measurementId: "G-B802SQHC08"
-  };
+};
 
-let app: FirebaseApp;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
-}
+// Инициализация Firebase
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
 
-const db: Database = getDatabase(app);
+export { app, auth, db };
 
-export { app, db };
-
+export const initializeFirebase = async () => {
+  try {
+    // Инициализация схем
+    await initializeFirebaseSchemas();
+    
+    console.log('Firebase initialized successfully');
+    return { app, db, auth };
+  } catch (error) {
+    console.error('Error initializing Firebase:', error);
+    throw error;
+  }
+}; 

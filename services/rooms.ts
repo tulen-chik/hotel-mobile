@@ -10,7 +10,6 @@ import {
 } from 'firebase/database';
 import { Reservation } from '../types';
 import { db } from './firebase/init';
-import { notifyNewReservation } from './notifications';
 
 // Room Management
 export const createRoom = async (roomData: Omit<Room, 'id'>): Promise<Room> => {
@@ -282,16 +281,6 @@ export const createReservation = async (data: Omit<Reservation, 'id' | 'createdA
       guestName: user.name
     });
 
-    // Отправляем уведомление администраторам
-    await notifyNewReservation({
-      ...reservation,
-      status: 'active' as const,
-      checkIn: new Date(reservation.checkIn),
-      checkOut: new Date(reservation.checkOut),
-      createdAt: new Date(reservation.createdAt),
-      updatedAt: new Date(reservation.updatedAt)
-    });
-
     return reservationId;
   } catch (error) {
     console.error('Error creating reservation:', error);
@@ -349,15 +338,6 @@ export const cancelReservation = async (reservationId: string) => {
       cleaningStatus: 'needs_cleaning'
     });
     console.log('Room status updated successfully');
-
-    console.log('Sending notification to admins...');
-    // Send notification to admins
-    await notifyNewReservation({
-      ...reservation,
-      status: 'cancelled',
-      updatedAt: now
-    });
-    console.log('Notification sent successfully');
 
     // Логируем действие
     await logRoomAction(reservation.roomId, reservation.userId, 'reservation_cancelled', {

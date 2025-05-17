@@ -1,4 +1,4 @@
-import { db } from '@/services/firebase/config';
+import { db } from '@/services/firebase/init';
 import { User } from '@/types';
 import { get, onValue, ref } from 'firebase/database';
 

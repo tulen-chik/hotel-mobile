@@ -10,7 +10,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { AppProvider } from '@/contexts/AppProvider';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { initializeFirebaseSchemas } from '@/services/firebase/schemas';
+import { initializeApp } from '@/services/firebase/initialize';
 
 function RootLayoutNav() {
   const { user, isCleaner } = useAuth();
@@ -48,8 +48,8 @@ export default function RootLayout() {
   useEffect(() => {
     const init = async () => {
       try {
-        await initializeFirebaseSchemas();
-        setIsInitialized(true);
+
+          initializeApp().then(() => setIsInitialized(true)).catch(console.error);
       } catch (error) {
         console.error('Failed to initialize Firebase:', error);
         setInitError(error instanceof Error ? error.message : 'Failed to initialize app');

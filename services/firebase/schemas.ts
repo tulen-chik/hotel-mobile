@@ -1,5 +1,5 @@
 import { get, ref, set } from 'firebase/database';
-import { db } from './init';
+import { db } from './config';
 
 // Определение схем коллекций
 const collections = {
@@ -83,22 +83,6 @@ const collections = {
       { fields: ['cleanerId', 'cleanedAt'], type: 'descending' }
     ]
   },
-  notifications: {
-    fields: {
-      id: 'string',
-      userId: 'string',
-      title: 'string',
-      body: 'string',
-      type: 'string', // 'cleaning' | 'reservation' | 'system'
-      data: 'map?',
-      read: 'boolean',
-      createdAt: 'timestamp'
-    },
-    indexes: [
-      { fields: ['userId', 'createdAt'], type: 'descending' },
-      { fields: ['type', 'createdAt'], type: 'descending' }
-    ]
-  },
   reservations: {
     fields: {
       id: 'string',
@@ -143,21 +127,33 @@ const collections = {
 // Функция для создания схем и индексов
 export const initializeFirebaseSchemas = async () => {
   try {
-    // Проверяем существование коллекций
+    // Проверяем существование коллекций и создаем схемы
     for (const [collectionName, schema] of Object.entries(collections)) {
       const collectionRef = ref(db, collectionName);
+      const schemaRef = ref(db, `_schemas/${collectionName}`);
       const snapshot = await get(collectionRef);
+      const schemaSnapshot = await get(schemaRef);
       
+      // Создаем пустую коллекцию, если она не существует
       if (!snapshot.exists()) {
-        // Создаем пустую коллекцию без тестовых данных
         await set(collectionRef, {});
         console.log(`Collection ${collectionName} initialized`);
       }
+      
+      // Создаем схему, если она не существует
+      if (!schemaSnapshot.exists()) {
+        await set(schemaRef, {
+          fields: schema.fields,
+          indexes: schema.indexes,
+          createdAt: new Date().toISOString()
+        });
+        console.log(`Schema for ${collectionName} initialized`);
+      }
     }
     
-    console.log('All Firebase collections initialized successfully');
+    console.log('All Firebase collections and schemas initialized successfully');
   } catch (error) {
-    console.error('Error initializing Firebase collections:', error);
+    console.error('Error initializing Firebase collections and schemas:', error);
     throw error;
   }
 }; 

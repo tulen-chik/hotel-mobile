@@ -1,7 +1,6 @@
 import { CleaningRequest } from '@/types';
 import { get, onValue, push, ref, set, update } from 'firebase/database';
 import { db } from './firebase/init';
-import { sendNotification } from './notifications';
 
 // Получить свободных уборщиков
 async function getAvailableCleaners(): Promise<string[]> {
@@ -84,22 +83,6 @@ export async function createCleaningRequest(
     await set(newRequestRef, request);
     console.log('Cleaning request saved successfully');
 
-    // Отправляем уведомление уборщику, если он был назначен
-    if (assignedTo) {
-      console.log('Sending notification to assigned cleaner:', assignedTo);
-      await sendNotification([assignedTo], {
-        title: 'Новое задание на уборку',
-        body: `Вам назначена уборка комнаты ${roomId}`,
-        type: 'cleaning',
-        data: {
-          requestId,
-          roomId,
-          requestType
-        }
-      });
-      console.log('Notification sent successfully');
-    }
-
     console.log('Cleaning request creation completed successfully');
     return requestId;
   } catch (error) {
@@ -125,17 +108,6 @@ export async function assignCleaner(
     assignedTo: cleanerId,
     assignedAt: now,
     updatedAt: now
-  });
-
-  // Отправляем уведомление уборщику
-  await sendNotification([cleanerId], {
-    title: 'Новое задание на уборку',
-    body: 'Вам назначена новая уборка',
-    type: 'cleaning',
-    data: {
-      requestId,
-      roomId: (await get(requestRef)).val()?.roomId
-    }
   });
 }
 

@@ -1,6 +1,4 @@
 export type UserSettings = {
-  pushNotifications: boolean;
-  emailNotifications: boolean;
   soundEnabled: boolean;
 };
 
@@ -11,10 +9,10 @@ export type User = {
   name: string;
   role: 'admin' | 'cleaner' | 'user';
   settings: UserSettings;
-  pushToken?: string;
   phone?: string;
   createdAt?: string;
   updatedAt?: string;
+  password?: string; // Hashed password
 };
 
 export interface Room {
@@ -77,17 +75,6 @@ export interface CleaningRecord {
   status: 'completed' | 'in_progress';
   notes?: string;
 }
-
-export type Notification = {
-  id: string;
-  userId: string;
-  title: string;
-  body: string;
-  type: 'cleaning' | 'reservation' | 'system';
-  data?: Record<string, any>;
-  read: boolean;
-  createdAt: Date;
-};
 
 export interface Reservation {
   id: string;

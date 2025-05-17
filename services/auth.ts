@@ -1,19 +1,13 @@
 import { User, UserSettings } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  createUserWithEmailAndPassword,
-  getAuth,
-  signInWithEmailAndPassword,
-  signOut
-} from 'firebase/auth';
-import { get, ref, set, update } from 'firebase/database';
-import { app, db } from './firebase/init';
+import CryptoJS from 'crypto-js';
+import { equalTo, get, orderByChild, query, ref, set, update } from 'firebase/database';
+import { db } from './firebase/init';
 
 const USER_STORAGE_KEY = '@user';
+const SESSION_KEY = '@session';
 
 const defaultSettings: UserSettings = {
-  pushNotifications: true,
-  emailNotifications: true,
   soundEnabled: true,
 };
 
@@ -53,15 +47,17 @@ export const removeUserFromStorage = async () => {
   }
 };
 
+// Хеширование пароля
+function hashPassword(password: string): string {
+  return CryptoJS.SHA256(password).toString();
+}
+
 // Проверка существования пользователя по email
 async function isUserExists(email: string): Promise<boolean> {
   try {
-    const usersRef = ref(db, 'users');
+    const usersRef = query(ref(db, 'users'), orderByChild('email'), equalTo(email));
     const snapshot = await get(usersRef);
-    if (!snapshot.exists()) return false;
-
-    const users = snapshot.val();
-    return Object.values(users).some((user: any) => user.email === email);
+    return snapshot.exists();
   } catch (error) {
     console.error('Error checking user existence:', error);
     throw new Error('Ошибка при проверке существования пользователя');
@@ -119,45 +115,29 @@ export const registerUser = async (
       throw new Error('Пользователь с таким email уже существует');
     }
 
-    const auth = getAuth(app);
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
- 
-      const user: User = {
-        id: userCredential.user.uid,
-        uid: userCredential.user.uid,
-        email: userCredential.user.email!,
-        name: name.trim(),
-        role,
-        settings: defaultSettings,
-      };
+    const hashedPassword = hashPassword(password);
+    const userId = CryptoJS.lib.WordArray.random(16).toString();
 
-      await saveUserToStorage(user); 
+    const user: User = {
+      id: userId,
+      uid: userId,
+      email: email.trim(),
+      name: name.trim(),
+      role,
+      settings: defaultSettings,
+      password: hashedPassword,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
 
-      await set(ref(db, `users/${userCredential.user.uid}`), {
-        ...user,
-        phone: phone?.trim(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+    await set(ref(db, `users/${userId}`), user);
+    await saveUserToStorage(user);
+    await AsyncStorage.setItem(SESSION_KEY, userId);
 
-      return user;
-    } catch (error: any) {
-      console.error('Firebase auth error:', error);
-      if (error.code === 'auth/email-already-in-use') {
-        throw new Error('Пользователь с таким email уже существует');
-      }
-      if (error.code === 'auth/invalid-email') {
-        throw new Error('Некорректный формат email');
-      }
-      if (error.code === 'auth/weak-password') {
-        throw new Error('Пароль слишком простой');
-      }
-      throw new Error('Ошибка при регистрации');
-    }
+    return user;
   } catch (error) {
     console.error('Registration error:', error);
-    throw error; // Пробрасываем ошибку дальше
+    throw error;
   }
 };
 
@@ -165,7 +145,6 @@ export const loginUser = async (email: string, password: string): Promise<User> 
   try {
     console.log('[DEBUG] Login attempt for email:', email);
     
-    // Проверки
     if (!email || !password) {
       console.log('[DEBUG] Missing email or password');
       throw new Error('Email и пароль обязательны');
@@ -176,49 +155,34 @@ export const loginUser = async (email: string, password: string): Promise<User> 
       throw new Error('Некорректный формат email. Пример: user@example.com');
     }
 
-    const auth = getAuth(app);
-    try {
-      console.log('[DEBUG] Attempting Firebase authentication');
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      console.log('[DEBUG] Firebase auth successful, fetching user data');
-      
-      const userSnapshot = await get(ref(db, `users/${userCredential.user.uid}`));
-      
-      if (!userSnapshot.exists()) {
-        console.log('[DEBUG] User data not found in database');
-        throw new Error('Пользователь не найден');
-      }
-
-      const userData = userSnapshot.val();
-      const user: User = {
-        id: userCredential.user.uid,
-        uid: userCredential.user.uid,
-        email: userCredential.user.email!,
-        name: userData?.name || '',
-        role: userData?.role || 'user',
-        settings: userData?.settings || defaultSettings,
-        pushToken: userData?.pushToken,
-      };
-
-      console.log('[DEBUG] User data retrieved successfully');
-      await saveUserToStorage(user); 
-      return user;
-    } catch (error: any) {
-      console.error('[DEBUG] Firebase auth error:', error);
-      if (error.code === 'auth/user-not-found') {
-        throw new Error('Пользователь не найден. Проверьте правильность email');
-      }
-      if (error.code === 'auth/wrong-password') {
-        throw new Error('Неверный пароль');
-      }
-      if (error.code === 'auth/invalid-email') {
-        throw new Error('Некорректный формат email. Пример: user@example.com');
-      }
-      if (error.code === 'auth/too-many-requests') {
-        throw new Error('Слишком много попыток входа. Попробуйте позже');
-      }
-      throw new Error(`Ошибка при входе: ${error.message}`);
+    const usersRef = query(ref(db, 'users'), orderByChild('email'), equalTo(email));
+    const snapshot = await get(usersRef);
+    
+    if (!snapshot.exists()) {
+      throw new Error('Пользователь не найден');
     }
+
+    const users = snapshot.val();
+    const userId = Object.keys(users)[0];
+    const userData = users[userId];
+
+    const hashedPassword = hashPassword(password);
+    if (userData.password !== hashedPassword) {
+      throw new Error('Неверный пароль');
+    }
+
+    const user: User = {
+      id: userId,
+      uid: userId,
+      email: userData.email,
+      name: userData.name,
+      role: userData.role,
+      settings: userData.settings || defaultSettings,
+    };
+
+    await saveUserToStorage(user);
+    await AsyncStorage.setItem(SESSION_KEY, userId);
+    return user;
   } catch (error) {
     console.error('[DEBUG] Login error:', error);
     throw error;
@@ -226,9 +190,8 @@ export const loginUser = async (email: string, password: string): Promise<User> 
 };
 
 export const logoutUser = async (): Promise<void> => {
-  const auth = getAuth(app);
-  await signOut(auth);
   await removeUserFromStorage();
+  await AsyncStorage.removeItem(SESSION_KEY);
 };
 
 export const updateUserProfile = async (
@@ -277,22 +240,26 @@ export const updateUserProfile = async (
 };
 
 export const getCurrentUser = async (): Promise<User | null> => {
-  const auth = getAuth(app);
-  const user = auth.currentUser;
-  if (!user) return null;
+  try {
+    const sessionId = await AsyncStorage.getItem(SESSION_KEY);
+    if (!sessionId) return null;
 
-  const userSnapshot = await get(ref(db, `users/${user.uid}`));
-  const userData = userSnapshot.val();
+    const userSnapshot = await get(ref(db, `users/${sessionId}`));
+    if (!userSnapshot.exists()) return null;
 
-  return {
-    id: user.uid,
-    uid: user.uid,
-    email: user.email!,
-    name: userData?.name || '',
-    role: userData?.role || 'cleaner',
-    settings: userData?.settings || defaultSettings,
-    pushToken: userData?.pushToken,
-  };
+    const userData = userSnapshot.val();
+    return {
+      id: userData.id,
+      uid: userData.uid,
+      email: userData.email,
+      name: userData.name,
+      role: userData.role,
+      settings: userData.settings || defaultSettings,
+    };
+  } catch (error) {
+    console.error('Error getting current user:', error);
+    return null;
+  }
 };
 
 export const createUserByAdmin = async (
@@ -303,7 +270,6 @@ export const createUserByAdmin = async (
   phone?: string
 ): Promise<User> => {
   try {
-    // Проверки
     if (!email || !password || !name) {
       throw new Error('Все поля обязательны для заполнения');
     }
@@ -325,34 +291,26 @@ export const createUserByAdmin = async (
       throw new Error('Пользователь с таким email уже существует');
     }
 
-    const auth = getAuth(app);
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
- 
+    const hashedPassword = hashPassword(password);
+    const userId = CryptoJS.lib.WordArray.random(16).toString();
+
     const user: User = {
-      id: userCredential.user.uid,
-      uid: userCredential.user.uid,
-      email: userCredential.user.email!,
+      id: userId,
+      uid: userId,
+      email: email.trim(),
       name: name.trim(),
       role,
       settings: defaultSettings,
+      password: hashedPassword,
       phone: phone?.trim(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
-    await set(ref(db, `users/${userCredential.user.uid}`), user);
+    await set(ref(db, `users/${userId}`), user);
     return user;
   } catch (error: any) {
     console.error('Create user error:', error);
-    if (error.code === 'auth/email-already-in-use') {
-      throw new Error('Пользователь с таким email уже существует');
-    }
-    if (error.code === 'auth/invalid-email') {
-      throw new Error('Некорректный формат email');
-    }
-    if (error.code === 'auth/weak-password') {
-      throw new Error('Пароль слишком простой');
-    }
     throw new Error(error.message || 'Ошибка при создании пользователя');
   }
 }; 
