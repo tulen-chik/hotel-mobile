@@ -9,6 +9,7 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 
 export default function CleaningScreen() {
   const { user } = useAuth();
+  if (!user || user.role !== 'cleaner') return null;
   const { requests, loading, updateRequestStatus } = useCleaningRequest();
   const router = useRouter();
   const [doorStatuses, setDoorStatuses] = useState<Record<string, 'locked' | 'unlocked'>>({});

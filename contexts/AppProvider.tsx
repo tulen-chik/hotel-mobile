@@ -1,34 +1,32 @@
-import LoadingScreen from '@/components/LoadingScreen';
-import { initializeApp } from '@/services/firebase/initialize';
-import React, { useEffect, useState } from 'react';
-import { AuthProvider } from './AuthContext';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { useAuth } from './AuthContext';
 import { CleaningProvider } from './CleaningContext';
 import { CleaningRequestProvider } from './CleaningRequestContext';
 import { ReservationProvider } from './ReservationContext';
 import { RoomProvider } from './RoomContext';
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isInitialized, setIsInitialized] = useState(false);
+  const { user, isCleaner } = useAuth();
+  const router = useRouter();
 
-  useEffect(() => {
-    initializeApp().then(() => setIsInitialized(true)).catch(console.error);
-  }, []);
-
-
-  if (!isInitialized) {
-    return <LoadingScreen message="Инициализация приложения..." />;
-  }
+  // useEffect(() => {
+  //   if (isCleaner) {
+  //     router.replace('/(cleaner)' as any);
+  //   } else {
+  //     router.replace('/(user)' as any);
+  //   }
+  // }, [user, isCleaner]);
 
   return (
-    <AuthProvider>
-      <ReservationProvider>
-        <RoomProvider>
-          <CleaningProvider>
-            <CleaningRequestProvider>
-              {children}
-            </CleaningRequestProvider>
-          </CleaningProvider>
-        </RoomProvider>
-      </ReservationProvider>
-    </AuthProvider>
+    <ReservationProvider>
+      <RoomProvider>
+        <CleaningProvider>
+          <CleaningRequestProvider>
+            {children}
+          </CleaningRequestProvider>
+        </CleaningProvider>
+      </RoomProvider>
+    </ReservationProvider>
   );
 }; 

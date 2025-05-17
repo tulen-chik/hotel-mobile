@@ -23,6 +23,7 @@ export interface Room {
   beds: number;
   rooms: number;
   isOccupied: boolean;
+  imageUrl?: string;
   currentGuest?: {
     uid: string;
     name: string;
@@ -31,6 +32,41 @@ export interface Room {
   };
   lastCleaned: string;
   cleaningStatus: 'clean' | 'needs_cleaning' | 'in_progress';
+  doorStatus: 'locked' | 'unlocked';
+  lightStatus: 'on' | 'off';
+  humidity: number;
+  doorActions: {
+    [key: string]: {
+      action: 'unlock' | 'lock' | 'auto_lock';
+      userId: string;
+      userName: string;
+      timestamp: string;
+      type: 'manual' | 'auto';
+    };
+  };
+  lastDoorAction?: {
+    action: 'unlock' | 'lock' | 'auto_lock';
+    userId: string;
+    userName: string;
+    timestamp: string;
+    type: 'manual' | 'auto';
+  };
+  price: {
+    perNight: number;
+    currency: string;
+  };
+  description: string;
+  additionalInfo: {
+    floor: number;
+    area: number; // площадь в м²
+    maxGuests: number;
+    amenities: string[]; // удобства: wifi, tv, minibar и т.д.
+    view: 'city' | 'sea' | 'garden' | 'mountain';
+    bedType: 'single' | 'double' | 'king' | 'twin';
+    bathroomType: 'private' | 'shared';
+    smokingAllowed: boolean;
+    petsAllowed: boolean;
+  };
 }
 
 export interface CleaningRecord {

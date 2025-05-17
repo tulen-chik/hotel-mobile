@@ -13,11 +13,10 @@ const TabIcon = ({ name, color, size }: TabIconProps) => {
   return <Ionicons name={name} size={size} color={color} />;
 };
 
-// Предзагрузим все иконки
 Ionicons.loadFont();
 
 export default function TabLayout() {
-  const { user } = useAuth();
+  const { user, isCleaner } = useAuth();
 
   return (
     <Tabs
@@ -32,6 +31,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: '#000',
         tabBarInactiveTintColor: '#666',
         headerShown: false,
+        tabBarShowLabel: false,
       }}
     >
       <Tabs.Screen
@@ -40,19 +40,22 @@ export default function TabLayout() {
           tabBarIcon: (props) => <TabIcon name="bed-outline" {...props} />,
         }}
       />
-      <Tabs.Screen
-        name="reservations"
-        options={{
-          tabBarIcon: (props) => <TabIcon name="calendar-outline" {...props} />,
+      {!isCleaner && (
+        <Tabs.Screen
+          name="reservations"
+          options={{
+            tabBarIcon: (props) => <TabIcon name="calendar-outline" {...props} />,
           }}
         />
-      <Tabs.Screen
-        name="cleaning"
-        options={{
-          tabBarIcon: (props) => <TabIcon name="water-outline" {...props} />,
-        }}
-      />
-
+      )}
+      {isCleaner && (
+        <Tabs.Screen
+          name="cleaning"
+          options={{
+            tabBarIcon: (props) => <TabIcon name="water-outline" {...props} />,
+          }}
+        />
+      )}
       <Tabs.Screen
         name="settings"
         options={{

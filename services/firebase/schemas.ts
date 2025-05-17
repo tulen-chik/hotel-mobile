@@ -32,6 +32,7 @@ const collections = {
       beds: 'number',
       rooms: 'number',
       isOccupied: 'boolean',
+      imageUrl: 'string?', // Optional URL to the room's image
       currentGuest: {
         uid: 'string',
         name: 'string',

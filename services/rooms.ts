@@ -1,4 +1,4 @@
-import { CleaningRecord } from '@/types';
+import { CleaningRecord, Room } from '@/types';
 import {
   get,
   onValue,
@@ -45,6 +45,19 @@ export interface Room {
     timestamp: string;
     type: 'manual' | 'auto';
   };
+  price: { perNight: number; currency: string };
+  description: string;
+  additionalInfo: {
+    floor: number;
+    area: number;
+    maxGuests: number;
+    amenities: string[];
+    view: string;
+    bedType: string;
+    bathroomType: string;
+    smokingAllowed: boolean;
+    petsAllowed: boolean;
+  };
 }
 
 // Room Management
@@ -63,6 +76,19 @@ export const createRoom = async (roomData: Omit<Room, 'id'>): Promise<Room> => {
       lightStatus: 'off',
       humidity: 0,
       doorActions: {},
+      price: roomData.price || { perNight: 0, currency: 'RUB' },
+      description: roomData.description || '',
+      additionalInfo: roomData.additionalInfo || {
+        floor: 1,
+        area: 0,
+        maxGuests: 2,
+        amenities: [],
+        view: 'city',
+        bedType: 'double',
+        bathroomType: 'private',
+        smokingAllowed: false,
+        petsAllowed: false
+      }
     };
     
     await set(newRoomRef, room);
