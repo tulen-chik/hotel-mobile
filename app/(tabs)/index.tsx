@@ -105,8 +105,51 @@ export default function RoomsScreen() {
             </View>
           </View>
 
+          <View style={styles.roomFeatures}>
+            <View style={styles.featureItem}>
+              <Ionicons 
+                name={item.additionalInfo.bedType === 'king' ? 'bed' : 
+                      item.additionalInfo.bedType === 'twin' ? 'bed-outline' :
+                      item.additionalInfo.bedType === 'single' ? 'bed-outline' : 'bed'} 
+                size={16} 
+                color={item.isOccupied ? '#fff' : '#666'} 
+              />
+              <Text style={[styles.featureText, item.isOccupied && styles.textWhite]}>
+                {item.additionalInfo.bedType === 'king' ? 'King-size кровать' :
+                 item.additionalInfo.bedType === 'twin' ? 'Две односпальные кровати' :
+                 item.additionalInfo.bedType === 'single' ? 'Односпальная кровать' : 'Двуспальная кровать'}
+              </Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Ionicons 
+                name={item.additionalInfo.bathroomType === 'private' ? 'water' : 'water-outline'} 
+                size={16} 
+                color={item.isOccupied ? '#fff' : '#666'} 
+              />
+              <Text style={[styles.featureText, item.isOccupied && styles.textWhite]}>
+                {item.additionalInfo.bathroomType === 'private' ? 'Собственная ванная' : 'Общая ванная'}
+              </Text>
+            </View>
+            {item.additionalInfo.smokingAllowed && (
+              <View style={styles.featureItem}>
+                <Ionicons name="flame" size={16} color={item.isOccupied ? '#fff' : '#666'} />
+                <Text style={[styles.featureText, item.isOccupied && styles.textWhite]}>
+                  Разрешено курение
+                </Text>
+              </View>
+            )}
+            {item.additionalInfo.petsAllowed && (
+              <View style={styles.featureItem}>
+                <Ionicons name="paw" size={16} color={item.isOccupied ? '#fff' : '#666'} />
+                <Text style={[styles.featureText, item.isOccupied && styles.textWhite]}>
+                  Разрешены питомцы
+                </Text>
+              </View>
+            )}
+          </View>
+
           <View style={styles.amenities}>
-            {item.additionalInfo.amenities.map((amenity, index) => (
+            {item.additionalInfo?.amenities?.map((amenity, index) => (
               <View key={index} style={styles.amenityBadge}>
                 <Text style={[styles.amenityText, item.isOccupied && styles.textWhite]}>
                   {amenity}
@@ -314,5 +357,24 @@ const styles = StyleSheet.create({
     color: '#d32f2f',
     textAlign: 'center',
     padding: 16,
+  },
+  roomFeatures: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  featureText: {
+    fontSize: 12,
+    color: '#666',
   },
 });

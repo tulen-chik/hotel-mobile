@@ -1,11 +1,11 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useCleaningRequest } from '@/contexts/CleaningRequestContext';
-import { subscribeToDoorStatus, toggleLight, unlockDoor } from '@/services/rooms';
+import { subscribeToDoorStatus } from '@/services/rooms';
 import { CleaningRequest } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function CleaningScreen() {
   const { user } = useAuth();
@@ -70,21 +70,103 @@ export default function CleaningScreen() {
     }
   };
 
+  // --- Методы управления светом и дверью ---
+  const makeGetRequestLightsOn = async () => {
+    try {
+      const response = await fetch('http://192.168.43.141:8000/LightOn', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      return true;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return false;
+    }
+  };
+  const makeGetRequestLightsOff = async () => {
+    try {
+      const response = await fetch('http://192.168.43.141:8000/LightOff', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      return true;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return false;
+    }
+  };
+  const makeGetRequestDoorLockOpen = async () => {
+    try {
+      const response = await fetch('http://192.168.43.141:8000/DoorLockOpen', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      return true;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return false;
+    }
+  };
+  const makeGetRequestDoorLockClose = async () => {
+    try {
+      const response = await fetch('http://192.168.43.141:8000/DoorLockClose', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      return true;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return false;
+    }
+  };
+
+  // --- handleUnlockDoor ---
   const handleUnlockDoor = async (roomId: string) => {
     try {
-      await unlockDoor(roomId, user.id);
+      const ok = await makeGetRequestDoorLockOpen();
+      if (ok) {
+        Alert.alert('Успех', 'Дверь разблокирована');
+      } else {
+        Alert.alert('Ошибка', 'Не удалось разблокировать дверь');
+      }
     } catch (error) {
       Alert.alert('Ошибка', 'Не удалось разблокировать дверь');
     }
   };
-
+  // --- handleToggleLight ---
   const handleToggleLight = async (roomId: string) => {
     try {
-      await toggleLight(roomId, user.id);
+      let ok = false;
+      if (lightStatuses[roomId] === 'on') {
+        ok = await makeGetRequestLightsOff();
+      } else {
+        ok = await makeGetRequestLightsOn();
+      }
       setLightStatuses(prev => ({
         ...prev,
         [roomId]: prev[roomId] === 'on' ? 'off' : 'on'
       }));
+      Alert.alert(ok ? 'Успех' : 'Ошибка', ok ? (lightStatuses[roomId] === 'on' ? 'Свет выключен' : 'Свет включен') : 'Не удалось переключить свет');
     } catch (error) {
       Alert.alert('Ошибка', 'Не удалось переключить свет');
     }
@@ -167,55 +249,57 @@ export default function CleaningScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>
-          {user.role === 'cleaner' ? 'Задания на уборку' : 'Запросы на уборку'}
-        </Text>
-      </View>
-
-      {filteredRequests.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>
-            {user.role === 'cleaner' ? 'У вас нет заданий на уборку' : 'У вас нет запросов на уборку'}
+    <SafeAreaView style={{flex:1, backgroundColor:'#fff', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 32 : 16}}>
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>
+            {user.role === 'cleaner' ? 'Задания на уборку' : 'Запросы на уборку'}
           </Text>
         </View>
-      ) : (
-        <View style={styles.requestsList}>
-          {filteredRequests.map((request) => (
-            <View key={request.id} style={styles.requestCard}>
-              <View style={styles.requestHeader}>
-                <Text style={styles.requestType}>
-                  {request.requestType === 'urgent' ? 'Срочная уборка' : 'Обычная уборка'}
+
+        {filteredRequests.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              {user.role === 'cleaner' ? 'У вас нет заданий на уборку' : 'У вас нет запросов на уборку'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.requestsList}>
+            {filteredRequests.map((request) => (
+              <View key={request.id} style={styles.requestCard}>
+                <View style={styles.requestHeader}>
+                  <Text style={styles.requestType}>
+                    {request.requestType === 'urgent' ? 'Срочная уборка' : 'Обычная уборка'}
+                  </Text>
+                  <Text style={[
+                    styles.requestStatus,
+                    request.status === 'completed' && styles.statusCompleted,
+                    request.status === 'pending' && styles.statusPending,
+                    request.status === 'approved' && styles.statusApproved,
+                    request.status === 'rejected' && styles.statusRejected,
+                  ]}>
+                    {request.status === 'completed' && 'Выполнено'}
+                    {request.status === 'pending' && 'Ожидает'}
+                    {request.status === 'approved' && 'Одобрено'}
+                    {request.status === 'rejected' && 'Отклонено'}
+                  </Text>
+                </View>
+
+                {request.notes && (
+                  <Text style={styles.requestNotes}>{request.notes}</Text>
+                )}
+
+                <Text style={styles.requestDate}>
+                  Создано: {new Date(request.createdAt).toLocaleDateString()}
                 </Text>
-                <Text style={[
-                  styles.requestStatus,
-                  request.status === 'completed' && styles.statusCompleted,
-                  request.status === 'pending' && styles.statusPending,
-                  request.status === 'approved' && styles.statusApproved,
-                  request.status === 'rejected' && styles.statusRejected,
-                ]}>
-                  {request.status === 'completed' && 'Выполнено'}
-                  {request.status === 'pending' && 'Ожидает'}
-                  {request.status === 'approved' && 'Одобрено'}
-                  {request.status === 'rejected' && 'Отклонено'}
-                </Text>
+
+                {getStatusActions(request)}
               </View>
-
-              {request.notes && (
-                <Text style={styles.requestNotes}>{request.notes}</Text>
-              )}
-
-              <Text style={styles.requestDate}>
-                Создано: {new Date(request.createdAt).toLocaleDateString()}
-              </Text>
-
-              {getStatusActions(request)}
-            </View>
-          ))}
-        </View>
-      )}
-    </ScrollView>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

@@ -7,7 +7,7 @@ import { Reservation } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ReservationsScreen() {
   const { user } = useAuth();
@@ -108,12 +108,21 @@ export default function ReservationsScreen() {
     const checkOut = new Date(reservation.checkOut);
     return (
       reservation.status === 'active' && 
-      (checkIn <= now && checkOut >= now) || // текущие резервации
-      (checkIn > now) // будущие резервации
+      checkIn <= now && checkOut >= now // только текущие резервации
+    );
+  };
+
+  const isReservationUpcoming = (reservation: Reservation) => {
+    const now = new Date();
+    const checkIn = new Date(reservation.checkIn);
+    return (
+      reservation.status === 'active' && 
+      checkIn > now // будущие резервации
     );
   };
 
   const activeReservations = reservations.filter(isReservationActive);
+  const upcomingReservations = reservations.filter(isReservationUpcoming);
 
   const handleRequestCleaning = async () => {
     if (!selectedReservation) return;
@@ -135,15 +144,92 @@ export default function ReservationsScreen() {
     }
   };
 
+  // --- Методы управления светом и дверью ---
+  const makeGetRequestLightsOn = async () => {
+    try {
+      const response = await fetch('http://192.168.43.141:8000/LightOn', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return true;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return false;
+    } 
+  };
+  const makeGetRequestLightsOff = async () => {
+    try {
+      const response = await fetch('http://192.168.43.141:8000/LightOff', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return true;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return false;
+    } 
+  };
+  const makeGetRequestDoorLockOpen = async () => {
+    try {
+      const response = await fetch('http://192.168.43.141:8000/DoorLockOpen', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return true;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return false;
+    }
+  };
+  const makeGetRequestDoorLockClose = async () => {
+    try {
+      const response = await fetch('http://192.168.43.141:8000/DoorLockClose', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return true;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return false;
+    }
+  };
+  // --- handleControlDevice ---
   const handleControlDevice = async (device: 'door' | 'light', value: boolean) => {
     try {
-      // Здесь будет логика управления устройствами
       if (device === 'door') {
+        let ok = false;
+        if (value) {
+          ok = await makeGetRequestDoorLockClose();
+        } else {
+          ok = await makeGetRequestDoorLockOpen();
+        }
         setDoorLocked(value);
-        Alert.alert('Успех', value ? 'Дверь заблокирована' : 'Дверь разблокирована');
+        Alert.alert(ok ? 'Успех' : 'Ошибка', value ? 'Дверь заблокирована' : 'Дверь разблокирована');
       } else {
+        let ok = false;
+        if (value) {
+          ok = await makeGetRequestLightsOn();
+        } else {
+          ok = await makeGetRequestLightsOff();
+        }
         setLightsOn(value);
-        Alert.alert('Успех', value ? 'Свет включен' : 'Свет выключен');
+        Alert.alert(ok ? 'Успех' : 'Ошибка', value ? 'Свет включен' : 'Свет выключен');
       }
     } catch (error) {
       Alert.alert('Ошибка', 'Не удалось управлять устройством');
@@ -301,7 +387,7 @@ export default function ReservationsScreen() {
     );
   }
 
-  if (activeReservations.length === 0) {
+  if (activeReservations.length === 0 && upcomingReservations.length === 0) {
     return (
       <View style={styles.container}>
         <View style={styles.emptyContainer}>
@@ -319,114 +405,191 @@ export default function ReservationsScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      {activeReservations.map((reservation) => {
-        const statusInfo = getStatusInfo(reservation.status);
-        const duration = calculateDuration(reservation.checkIn, reservation.checkOut);
-        const room = rooms[reservation.roomId];
+    <SafeAreaView style={{flex:1, backgroundColor:'#f5f5f5', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 32 : 16}}>
+      <ScrollView style={styles.container}>
+        {activeReservations.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Текущие бронирования</Text>
+            {activeReservations.map((reservation) => {
+              const statusInfo = getStatusInfo(reservation.status);
+              const duration = calculateDuration(reservation.checkIn, reservation.checkOut);
+              const room = rooms[reservation.roomId];
 
-        return (
-          <TouchableOpacity
-            key={reservation.id}
-            style={styles.reservationCard}
-            onPress={() => router.push(`/room/${reservation.roomId}`)}
-          >
-            <View style={styles.reservationHeader}>
-              <View style={styles.roomInfo}>
-                <Text style={styles.roomNumber}>
-                  №{room?.number || '...'}
-                </Text>
-                <Text style={styles.roomDetails}>
-                  {room?.beds} кровати • {room?.rooms} комнаты
-                </Text>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: statusInfo.bgColor }]}>
-                <Ionicons name={statusInfo.icon as any} size={16} color={statusInfo.color} />
-                <Text style={[styles.statusText, { color: statusInfo.color }]}>
-                  {statusInfo.text}
-                </Text>
-              </View>
-            </View>
+              return (
+                <TouchableOpacity
+                  key={reservation.id}
+                  style={styles.reservationCard}
+                  onPress={() => router.push(`/room/${reservation.roomId}`)}
+                >
+                  <View style={styles.reservationHeader}>
+                    <View style={styles.roomInfo}>
+                      <Text style={styles.roomNumber}>
+                        №{room?.number || '...'}
+                      </Text>
+                      <Text style={styles.roomDetails}>
+                        {room?.beds} кровати • {room?.rooms} комнаты
+                      </Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: statusInfo.bgColor }]}>
+                      <Ionicons name={statusInfo.icon as any} size={16} color={statusInfo.color} />
+                      <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                        {statusInfo.text}
+                      </Text>
+                    </View>
+                  </View>
 
-            <View style={styles.datesContainer}>
-              <View style={styles.dateItem}>
-                <Ionicons name="calendar-outline" size={20} color="#666" />
-                <View style={styles.dateInfo}>
-                  <Text style={styles.dateLabel}>Заезд</Text>
-                  <Text style={styles.dateValue}>{formatDate(reservation.checkIn)}</Text>
-                </View>
-              </View>
-              <View style={styles.dateDivider} />
-              <View style={styles.dateItem}>
-                <Ionicons name="calendar-outline" size={20} color="#666" />
-                <View style={styles.dateInfo}>
-                  <Text style={styles.dateLabel}>Выезд</Text>
-                  <Text style={styles.dateValue}>{formatDate(reservation.checkOut)}</Text>
-                </View>
-              </View>
-            </View>
+                  <View style={styles.datesContainer}>
+                    <View style={styles.dateItem}>
+                      <Ionicons name="calendar-outline" size={20} color="#666" />
+                      <View style={styles.dateInfo}>
+                        <Text style={styles.dateLabel}>Заезд</Text>
+                        <Text style={styles.dateValue}>{formatDate(reservation.checkIn)}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.dateDivider} />
+                    <View style={styles.dateItem}>
+                      <Ionicons name="calendar-outline" size={20} color="#666" />
+                      <View style={styles.dateInfo}>
+                        <Text style={styles.dateLabel}>Выезд</Text>
+                        <Text style={styles.dateValue}>{formatDate(reservation.checkOut)}</Text>
+                      </View>
+                    </View>
+                  </View>
 
-            <View style={styles.durationContainer}>
-              <Ionicons name="time-outline" size={20} color="#666" />
-              <Text style={styles.durationText}>
-                {duration} {duration === 1 ? 'день' : duration < 5 ? 'дня' : 'дней'}
-              </Text>
-            </View>
+                  <View style={styles.durationContainer}>
+                    <Ionicons name="time-outline" size={20} color="#666" />
+                    <Text style={styles.durationText}>
+                      {duration} {duration === 1 ? 'день' : duration < 5 ? 'дня' : 'дней'}
+                    </Text>
+                  </View>
 
-            <View style={styles.actionButtons}>
-              {reservation.status === 'active' && (
-                <>
-                  <TouchableOpacity
-                    style={styles.controlButton}
-                    onPress={() => {
-                      setSelectedReservation(reservation);
-                      setShowDoorModal(true);
-                    }}
-                  >
-                    <Ionicons name="lock-closed-outline" size={20} color="#2196F3" />
-                    <Text style={styles.controlButtonText}>Управление дверью</Text>
-                  </TouchableOpacity>
+                  <View style={styles.actionButtons}>
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity
+                        style={[styles.controlButton, styles.smallButton]}
+                        onPress={() => {
+                          setSelectedReservation(reservation);
+                          setShowDoorModal(true);
+                        }}
+                      >
+                        <Ionicons name="lock-closed-outline" size={16} color="#2196F3" />
+                        <Text style={styles.controlButtonText}>Дверь</Text>
+                      </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={styles.controlButton}
-                    onPress={() => {
-                      setSelectedReservation(reservation);
-                      setShowLightModal(true);
-                    }}
-                  >
-                    <Ionicons name="bulb-outline" size={20} color="#4CAF50" />
-                    <Text style={styles.controlButtonText}>Управление светом</Text>
-                  </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.controlButton, styles.smallButton]}
+                        onPress={() => {
+                          setSelectedReservation(reservation);
+                          setShowLightModal(true);
+                        }}
+                      >
+                        <Ionicons name="bulb-outline" size={16} color="#4CAF50" />
+                        <Text style={styles.controlButtonText}>Свет</Text>
+                      </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={styles.controlButton}
-                    onPress={() => {
-                      setSelectedReservation(reservation);
-                      setShowCleaningModal(true);
-                    }}
-                  >
-                    <Ionicons name="water-outline" size={20} color="#2196F3" />
-                    <Text style={styles.controlButtonText}>Заказать уборку</Text>
-                  </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.controlButton, styles.smallButton]}
+                        onPress={() => {
+                          setSelectedReservation(reservation);
+                          setShowCleaningModal(true);
+                        }}
+                      >
+                        <Ionicons name="water-outline" size={16} color="#2196F3" />
+                        <Text style={styles.controlButtonText}>Уборка</Text>
+                      </TouchableOpacity>
+                    </View>
 
-                  <TouchableOpacity
-                    style={[styles.controlButton, styles.cancelButton]}
-                    onPress={() => handleCancelReservation(reservation.id)}
-                  >
-                    <Ionicons name="close-circle-outline" size={20} color="#d32f2f" />
-                    <Text style={styles.cancelButtonText}>Отменить бронирование</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          </TouchableOpacity>
-        );
-      })}
+                    <TouchableOpacity
+                      style={[styles.controlButton, styles.cancelButton, styles.smallButton]}
+                      onPress={() => handleCancelReservation(reservation.id)}
+                    >
+                      <Ionicons name="close-circle-outline" size={16} color="#d32f2f" />
+                      <Text style={styles.cancelButtonText}>Отменить</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
-      <CleaningModal />
-      <DoorControlModal />
-      <LightControlModal />
-    </ScrollView>
+        {upcomingReservations.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Предстоящие бронирования</Text>
+            {upcomingReservations.map((reservation) => {
+              const statusInfo = getStatusInfo(reservation.status);
+              const duration = calculateDuration(reservation.checkIn, reservation.checkOut);
+              const room = rooms[reservation.roomId];
+
+              return (
+                <TouchableOpacity
+                  key={reservation.id}
+                  style={styles.reservationCard}
+                  onPress={() => router.push(`/room/${reservation.roomId}`)}
+                >
+                  <View style={styles.reservationHeader}>
+                    <View style={styles.roomInfo}>
+                      <Text style={styles.roomNumber}>
+                        №{room?.number || '...'}
+                      </Text>
+                      <Text style={styles.roomDetails}>
+                        {room?.beds} кровати • {room?.rooms} комнаты
+                      </Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: statusInfo.bgColor }]}>
+                      <Ionicons name={statusInfo.icon as any} size={16} color={statusInfo.color} />
+                      <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                        {statusInfo.text}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.datesContainer}>
+                    <View style={styles.dateItem}>
+                      <Ionicons name="calendar-outline" size={20} color="#666" />
+                      <View style={styles.dateInfo}>
+                        <Text style={styles.dateLabel}>Заезд</Text>
+                        <Text style={styles.dateValue}>{formatDate(reservation.checkIn)}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.dateDivider} />
+                    <View style={styles.dateItem}>
+                      <Ionicons name="calendar-outline" size={20} color="#666" />
+                      <View style={styles.dateInfo}>
+                        <Text style={styles.dateLabel}>Выезд</Text>
+                        <Text style={styles.dateValue}>{formatDate(reservation.checkOut)}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.durationContainer}>
+                    <Ionicons name="time-outline" size={20} color="#666" />
+                    <Text style={styles.durationText}>
+                      {duration} {duration === 1 ? 'день' : duration < 5 ? 'дня' : 'дней'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={[styles.controlButton, styles.cancelButton, styles.smallButton]}
+                      onPress={() => handleCancelReservation(reservation.id)}
+                    >
+                      <Ionicons name="close-circle-outline" size={16} color="#d32f2f" />
+                      <Text style={styles.cancelButtonText}>Отменить</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        <CleaningModal />
+        <DoorControlModal />
+        <LightControlModal />
+
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -455,7 +618,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   browseButton: {
-    backgroundColor: '#000',
+    backgroundColor: '#6924cc',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -471,12 +634,12 @@ const styles = StyleSheet.create({
     padding: 20,
     margin: 16,
     marginBottom: 8,
-    shadowColor: '#000',
+    shadowColor: '#6924cc',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 8,
     elevation: 4,
   },
@@ -505,10 +668,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     gap: 4,
+    backgroundColor: '#ede7f6',
   },
   statusText: {
     fontSize: 14,
     fontWeight: '500',
+    color: '#6924cc',
   },
   datesContainer: {
     flexDirection: 'row',
@@ -556,14 +721,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#ede7f6',
     padding: 12,
     borderRadius: 8,
     gap: 8,
     marginBottom: 8,
   },
   controlButtonText: {
-    color: '#2196F3',
+    color: '#6924cc',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -630,7 +795,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   confirmButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#6924cc',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
@@ -643,4 +808,18 @@ const styles = StyleSheet.create({
   actionButtons: {
     gap: 8,
   },
-}); 
+  section: {
+    marginBottom: 24,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  smallButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flex: 1,
+  },
+});
+

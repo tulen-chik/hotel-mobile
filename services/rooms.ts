@@ -12,54 +12,6 @@ import { Reservation } from '../types';
 import { db } from './firebase/config';
 import { notifyNewReservation } from './notifications';
 
-export interface Room {
-  id: string;
-  number: string;
-  beds: number;
-  rooms: number;
-  isOccupied: boolean;
-  currentGuest?: {
-    uid: string;
-    name: string;
-    checkIn: string;
-    checkOut: string;
-  };
-  lastCleaned: string;
-  cleaningStatus: 'clean' | 'needs_cleaning' | 'in_progress';
-  doorStatus: 'locked' | 'unlocked';
-  lightStatus: 'on' | 'off';
-  humidity: number;
-  doorActions: {
-    [key: string]: {
-      action: 'unlock' | 'lock' | 'auto_lock';
-      userId: string;
-      userName: string;
-      timestamp: string;
-      type: 'manual' | 'auto';
-    };
-  };
-  lastDoorAction?: {
-    action: 'unlock' | 'lock' | 'auto_lock';
-    userId: string;
-    userName: string;
-    timestamp: string;
-    type: 'manual' | 'auto';
-  };
-  price: { perNight: number; currency: string };
-  description: string;
-  additionalInfo: {
-    floor: number;
-    area: number;
-    maxGuests: number;
-    amenities: string[];
-    view: string;
-    bedType: string;
-    bathroomType: string;
-    smokingAllowed: boolean;
-    petsAllowed: boolean;
-  };
-}
-
 // Room Management
 export const createRoom = async (roomData: Omit<Room, 'id'>): Promise<Room> => {
   try {
@@ -316,10 +268,18 @@ export const createReservation = async (data: Omit<Reservation, 'id' | 'createdA
       isOccupied: true,
       currentGuest: {
         uid: data.userId,
-        name: '', // Имя гостя можно получить из данных пользователя
+        name: user.name || '',
         checkIn: data.checkIn.toISOString(),
         checkOut: data.checkOut.toISOString()
       }
+    });
+
+    // Логируем действие
+    await logRoomAction(data.roomId, data.userId, 'reservation_created', {
+      reservationId,
+      checkIn: data.checkIn,
+      checkOut: data.checkOut,
+      guestName: user.name
     });
 
     // Отправляем уведомление администраторам
@@ -399,7 +359,14 @@ export const cancelReservation = async (reservationId: string) => {
     });
     console.log('Notification sent successfully');
 
+    // Логируем действие
+    await logRoomAction(reservation.roomId, reservation.userId, 'reservation_cancelled', {
+      reservationId,
+      reason: 'user_cancelled'
+    });
+
     console.log('Reservation cancellation completed successfully');
+    return true;
   } catch (error) {
     console.error('Error in cancelReservation:', {
       error,
@@ -550,71 +517,109 @@ export const isRoomOccupied = async (
 };
 
 // Управление дверью
-export async function unlockDoor(roomId: string, userId: string): Promise<void> {
+export const unlockDoor = async (roomId: string, userId: string) => {
   try {
-    const roomRef = ref(db, `rooms/${roomId}`);
-    const roomSnapshot = await get(roomRef);
-    
-    if (!roomSnapshot.exists()) {
+    const room = await getRoom(roomId);
+    if (!room) {
       throw new Error('Room not found');
     }
 
-    const room = roomSnapshot.val();
-    
-    // Проверяем, имеет ли пользователь доступ к комнате
+    // Проверяем доступ
     const hasAccess = await checkRoomAccess(roomId, userId);
     if (!hasAccess) {
-      throw new Error('No access to this room');
+      throw new Error('No access to room');
     }
 
-    // Получаем информацию о пользователе
-    const userRef = ref(db, `users/${userId}`);
-    const userSnapshot = await get(userRef);
-    const user = userSnapshot.val();
+    const now = new Date();
+    const timestamp = now.getTime();
 
-    const now = new Date().toISOString();
+    // Создаем действие с дверью
     const doorAction = {
-      action: 'unlock',
+      timestamp: now.toISOString(),
       userId,
-      userName: user.name,
-      timestamp: now,
-      type: 'manual'
+      action: 'unlock'
     };
 
-    // Обновляем статус двери и логируем действие
-    await update(roomRef, {
+    // Обновляем статус двери
+    await updateRoom(roomId, {
       doorStatus: 'unlocked',
-      lastDoorAction: doorAction,
       doorActions: {
         ...room.doorActions,
-        [now]: doorAction
+        [timestamp]: doorAction
       }
     });
 
-    // Через 30 секунд автоматически блокируем дверь
-    setTimeout(async () => {
-      const autoLockAction = {
-        action: 'auto_lock',
-        userId: 'system',
-        userName: 'System',
-        timestamp: new Date().toISOString(),
-        type: 'auto'
-      };
+    // Логируем действие
+    await logRoomAction(roomId, userId, 'door_unlocked', {
+      timestamp: now.toISOString()
+    });
 
-      await update(roomRef, {
-        doorStatus: 'locked',
-        lastDoorAction: autoLockAction,
-        doorActions: {
-          ...room.doorActions,
-          [autoLockAction.timestamp]: autoLockAction
+    // Если пользователь не уборщик, устанавливаем таймер на автоматическую блокировку
+    const userRef = ref(db, `users/${userId}`);
+    const userSnap = await get(userRef);
+    const user = userSnap.val();
+
+    if (user.role !== 'cleaner') {
+      setTimeout(async () => {
+        try {
+          await lockDoor(roomId, 'system');
+        } catch (error) {
+          console.error('Error auto-locking door:', error);
         }
-      });
-    }, 30000);
+      }, 30000); // 30 секунд
+    }
+
+    return true;
   } catch (error) {
     console.error('Error unlocking door:', error);
     throw error;
   }
-}
+};
+
+// Функция для закрытия двери
+export const lockDoor = async (roomId: string, userId: string) => {
+  try {
+    const room = await getRoom(roomId);
+    if (!room) {
+      throw new Error('Room not found');
+    }
+
+    // Проверяем доступ
+    const hasAccess = await checkRoomAccess(roomId, userId);
+    if (!hasAccess) {
+      throw new Error('No access to room');
+    }
+
+    const now = new Date();
+    const timestamp = now.getTime();
+
+    // Создаем действие с дверью
+    const doorAction = {
+      timestamp: now.toISOString(),
+      userId,
+      action: 'lock'
+    };
+
+    // Обновляем статус двери
+    await updateRoom(roomId, {
+      doorStatus: 'locked',
+      doorActions: {
+        ...room.doorActions,
+        [timestamp]: doorAction
+      }
+    });
+
+    // Логируем действие
+    await logRoomAction(roomId, userId, 'door_locked', {
+      timestamp: now.toISOString()
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error locking door:', error);
+    throw error;
+  }
+};
 
 // Управление светом
 export async function toggleLight(roomId: string, userId: string): Promise<void> {
@@ -767,4 +772,89 @@ export const subscribeToDoorStatus = (
     const room = snapshot.val();
     onUpdate(room.doorStatus || 'locked');
   });
+};
+
+// Функция для обновления изображения комнаты
+export const updateRoomImage = async (roomId: string, imageBase64: string): Promise<void> => {
+  try {
+    const roomRef = ref(db, `rooms/${roomId}`);
+    await update(roomRef, { imageBase64 });
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Типы действий с комнатой
+type RoomActionType = 
+  | 'reservation_created'
+  | 'reservation_cancelled'
+  | 'reservation_completed'
+  | 'door_unlocked'
+  | 'door_locked'
+  | 'light_on'
+  | 'light_off'
+  | 'cleaning_requested'
+  | 'cleaning_completed'
+  | 'maintenance_requested'
+  | 'maintenance_completed';
+
+interface RoomAction {
+  id: string;
+  roomId: string;
+  userId: string;
+  type: RoomActionType;
+  timestamp: string;
+  details: Record<string, any>;
+}
+
+// Сохранение действия с комнатой
+async function logRoomAction(
+  roomId: string,
+  userId: string,
+  type: RoomActionType,
+  details: Record<string, any> = {}
+): Promise<string> {
+  try {
+    const actionsRef = ref(db, `roomActions/${roomId}`);
+    const newActionRef = push(actionsRef);
+    const actionId = newActionRef.key!;
+
+    const action: RoomAction = {
+      id: actionId,
+      roomId,
+      userId,
+      type,
+      timestamp: new Date().toISOString(),
+      details
+    };
+
+    await set(newActionRef, action);
+    return actionId;
+  } catch (error) {
+    console.error('Error logging room action:', error);
+    throw error;
+  }
+}
+
+// Добавляем функцию для получения истории действий с комнатой
+export const getRoomActions = async (roomId: string): Promise<RoomAction[]> => {
+  try {
+    const actionsRef = ref(db, `roomActions/${roomId}`);
+    const snapshot = await get(actionsRef);
+    
+    if (!snapshot.exists()) {
+      return [];
+    }
+
+    const actionsData = snapshot.val();
+    return Object.entries(actionsData)
+      .map(([id, data]: [string, any]) => ({
+        id,
+        ...data
+      }))
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  } catch (error) {
+    console.error('Error getting room actions:', error);
+    throw error;
+  }
 };

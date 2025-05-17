@@ -65,19 +65,19 @@ export async function sendNotification(
       })) as User[];
 
     // Отправляем push-уведомления
-    const pushTokens = users
-      .filter(user => user.settings.pushNotifications && user.pushToken)
-      .map(user => user.pushToken!);
+    // const pushTokens = users
+    //   .filter(user => user.settings.pushNotifications && user.pushToken)
+    //   .map(user => user.pushToken!);
 
-    if (pushTokens.length > 0) {
-      await sendPushNotifications(pushTokens, notification);
-    }
+    // if (pushTokens.length > 0) {
+    //   await sendPushNotifications(pushTokens, notification);
+    // }
 
-    // Отправляем email-уведомления
-    const emailUsers = users.filter(user => user.settings.emailNotifications);
-    if (emailUsers.length > 0) {
-      await sendEmailNotifications(emailUsers, notification);
-    }
+    // // Отправляем email-уведомления
+    // const emailUsers = users.filter(user => user.settings.emailNotifications);
+    // if (emailUsers.length > 0) {
+    //   await sendEmailNotifications(emailUsers, notification);
+    // }
   } catch (error) {
     console.error('Error sending notifications:', error);
     throw error;
@@ -237,17 +237,17 @@ export async function notifyNewReservation(reservation: Reservation) {
     await Promise.all(notificationPromises);
 
     // Отправляем push и email уведомления
-    // await sendNotification(adminIds, {
-    //   title: 'Новая резервация',
-    //   body: `Создана новая резервация для комнаты ${reservation.roomId}`,
-    //   type: 'reservation',
-    //   data: {
-    //     reservationId: reservation.id,
-    //     roomId: reservation.roomId,
-    //     checkIn: reservation.checkIn,
-    //     checkOut: reservation.checkOut
-    //   }
-    // });
+    await sendNotification(adminIds, {
+      title: 'Новая резервация',
+      body: `Создана новая резервация для комнаты ${reservation.roomId}`,
+      type: 'reservation',
+      data: {
+        reservationId: reservation.id,
+        roomId: reservation.roomId,
+        checkIn: reservation.checkIn,
+        checkOut: reservation.checkOut
+      }
+    });
   } catch (error) {
     console.error('Error sending reservation notification:', error);
     throw error;
@@ -300,4 +300,160 @@ export const subscribeToUnreadNotifications = (
 
     onUpdate(notifications);
   });
-}; 
+};
+
+// Уведомления для администраторов
+export async function notifyAdminNewUser(user: User) {
+  const admins = await getAdmins();
+  const adminIds = admins.map(admin => admin.id);
+
+  await sendNotification(adminIds, {
+    title: 'Новый пользователь',
+    body: `Зарегистрирован новый пользователь: ${user.name} (${user.email})`,
+    type: 'system',
+    data: {
+      userId: user.id,
+      userRole: user.role
+    }
+  });
+}
+
+export async function notifyAdminCleaningRequest(roomNumber: string, cleanerName: string) {
+  const admins = await getAdmins();
+  const adminIds = admins.map(admin => admin.id);
+
+  await sendNotification(adminIds, {
+    title: 'Новый запрос на уборку',
+    body: `Уборщик ${cleanerName} запросил доступ к комнате ${roomNumber}`,
+    type: 'cleaning',
+    data: {
+      roomNumber,
+      cleanerName
+    }
+  });
+}
+
+// Уведомления для уборщиков
+export async function notifyCleanerAssigned(cleanerId: string, roomNumber: string) {
+  await sendNotification([cleanerId], {
+    title: 'Новое задание',
+    body: `Вам назначена уборка комнаты ${roomNumber}`,
+    type: 'cleaning',
+    data: {
+      roomNumber,
+      status: 'assigned'
+    }
+  });
+}
+
+export async function notifyCleanerAccessGranted(cleanerId: string, roomNumber: string) {
+  await sendNotification([cleanerId], {
+    title: 'Доступ предоставлен',
+    body: `Вам предоставлен доступ к комнате ${roomNumber}`,
+    type: 'cleaning',
+    data: {
+      roomNumber,
+      status: 'access_granted'
+    }
+  });
+}
+
+export async function notifyCleanerAccessDenied(cleanerId: string, roomNumber: string) {
+  await sendNotification([cleanerId], {
+    title: 'Доступ отклонен',
+    body: `В доступе к комнате ${roomNumber} отказано`,
+    type: 'cleaning',
+    data: {
+      roomNumber,
+      status: 'access_denied'
+    }
+  });
+}
+
+// Уведомления для гостей
+export async function notifyGuestReservationConfirmed(userId: string, roomNumber: string, checkIn: Date, checkOut: Date) {
+  await sendNotification([userId], {
+    title: 'Бронирование подтверждено',
+    body: `Ваше бронирование комнаты ${roomNumber} подтверждено. Заезд: ${checkIn.toLocaleDateString()}, выезд: ${checkOut.toLocaleDateString()}`,
+    type: 'reservation',
+    data: {
+      roomNumber,
+      checkIn,
+      checkOut,
+      status: 'confirmed'
+    }
+  });
+}
+
+export async function notifyGuestReservationCancelled(userId: string, roomNumber: string) {
+  await sendNotification([userId], {
+    title: 'Бронирование отменено',
+    body: `Ваше бронирование комнаты ${roomNumber} отменено`,
+    type: 'reservation',
+    data: {
+      roomNumber,
+      status: 'cancelled'
+    }
+  });
+}
+
+export async function notifyGuestCleaningScheduled(userId: string, roomNumber: string, date: Date) {
+  await sendNotification([userId], {
+    title: 'Запланирована уборка',
+    body: `В вашей комнате ${roomNumber} запланирована уборка на ${date.toLocaleDateString()}`,
+    type: 'cleaning',
+    data: {
+      roomNumber,
+      date
+    }
+  });
+}
+
+export async function notifyGuestDoorUnlocked(userId: string, roomNumber: string) {
+  await sendNotification([userId], {
+    title: 'Дверь разблокирована',
+    body: `Дверь вашей комнаты ${roomNumber} разблокирована`,
+    type: 'system',
+    data: {
+      roomNumber,
+      action: 'door_unlocked'
+    }
+  });
+}
+
+export async function notifyGuestDoorLocked(userId: string, roomNumber: string) {
+  await sendNotification([userId], {
+    title: 'Дверь заблокирована',
+    body: `Дверь вашей комнаты ${roomNumber} заблокирована`,
+    type: 'system',
+    data: {
+      roomNumber,
+      action: 'door_locked'
+    }
+  });
+}
+
+// Общие уведомления
+export async function notifyMaintenance(userIds: string[], roomNumber: string, issue: string) {
+  await sendNotification(userIds, {
+    title: 'Техническое обслуживание',
+    body: `В комнате ${roomNumber} требуется техническое обслуживание: ${issue}`,
+    type: 'system',
+    data: {
+      roomNumber,
+      issue
+    }
+  });
+}
+
+export async function notifyEmergency(userIds: string[], roomNumber: string, message: string) {
+  await sendNotification(userIds, {
+    title: 'Экстренное уведомление',
+    body: `Комната ${roomNumber}: ${message}`,
+    type: 'system',
+    data: {
+      roomNumber,
+      emergency: true
+    }
+  });
+} 

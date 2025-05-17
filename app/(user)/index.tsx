@@ -54,6 +54,108 @@ export default function RoomsScreen() {
                 </View>
               </View>
             </View>
+            <View style={styles.priceContainer}>
+              <Text style={[styles.price, item.isOccupied && styles.textWhite]}>
+                {item.price.perNight} {item.price.currency}
+              </Text>
+              <Text style={[styles.priceLabel, item.isOccupied && styles.textWhite]}>
+                за ночь
+              </Text>
+            </View>
+          </View>
+
+          <Text style={[styles.description, item.isOccupied && styles.textWhite]}>
+            {item.description}
+          </Text>
+
+          <View style={styles.additionalInfo}>
+            <View style={styles.infoItem}>
+              <Ionicons 
+                name="square-outline" 
+                size={16} 
+                color={item.isOccupied ? '#fff' : '#666'} 
+              />
+              <Text style={[styles.infoText, item.isOccupied && styles.textWhite]}>
+                {item.additionalInfo.area} м²
+              </Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Ionicons 
+                name="people-outline" 
+                size={16} 
+                color={item.isOccupied ? '#fff' : '#666'} 
+              />
+              <Text style={[styles.infoText, item.isOccupied && styles.textWhite]}>
+                до {item.additionalInfo.maxGuests} гостей
+              </Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Ionicons 
+                name={item.additionalInfo.view === 'sea' ? 'water-outline' : 
+                      item.additionalInfo.view === 'mountain' ? 'image-outline' :
+                      item.additionalInfo.view === 'garden' ? 'leaf-outline' : 'business-outline'} 
+                size={16} 
+                color={item.isOccupied ? '#fff' : '#666'} 
+              />
+              <Text style={[styles.infoText, item.isOccupied && styles.textWhite]}>
+                {item.additionalInfo.view === 'sea' ? 'Вид на море' :
+                 item.additionalInfo.view === 'mountain' ? 'Вид на горы' :
+                 item.additionalInfo.view === 'garden' ? 'Вид на сад' : 'Вид на город'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.roomFeatures}>
+            <View style={styles.featureItem}>
+              <Ionicons 
+                name={item.additionalInfo.bedType === 'king' ? 'bed' : 
+                      item.additionalInfo.bedType === 'twin' ? 'bed-outline' :
+                      item.additionalInfo.bedType === 'single' ? 'bed-outline' : 'bed'} 
+                size={16} 
+                color={item.isOccupied ? '#fff' : '#666'} 
+              />
+              <Text style={[styles.featureText, item.isOccupied && styles.textWhite]}>
+                {item.additionalInfo.bedType === 'king' ? 'King-size кровать' :
+                 item.additionalInfo.bedType === 'twin' ? 'Две односпальные кровати' :
+                 item.additionalInfo.bedType === 'single' ? 'Односпальная кровать' : 'Двуспальная кровать'}
+              </Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Ionicons 
+                name={item.additionalInfo.bathroomType === 'private' ? 'water' : 'water-outline'} 
+                size={16} 
+                color={item.isOccupied ? '#fff' : '#666'} 
+              />
+              <Text style={[styles.featureText, item.isOccupied && styles.textWhite]}>
+                {item.additionalInfo.bathroomType === 'private' ? 'Собственная ванная' : 'Общая ванная'}
+              </Text>
+            </View>
+            {item.additionalInfo.smokingAllowed && (
+              <View style={styles.featureItem}>
+                <Ionicons name="flame" size={16} color={item.isOccupied ? '#fff' : '#666'} />
+                <Text style={[styles.featureText, item.isOccupied && styles.textWhite]}>
+                  Разрешено курение
+                </Text>
+              </View>
+            )}
+            {item.additionalInfo.petsAllowed && (
+              <View style={styles.featureItem}>
+                <Ionicons name="paw" size={16} color={item.isOccupied ? '#fff' : '#666'} />
+                <Text style={[styles.featureText, item.isOccupied && styles.textWhite]}>
+                  Разрешены питомцы
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.amenities}>
+            {item.additionalInfo?.amenities?.map((amenity, index) => (
+              <View key={index} style={styles.amenityBadge}>
+                <Text style={[styles.amenityText, item.isOccupied && styles.textWhite]}>
+                  {amenity}
+                </Text>
+              </View>
+            ))}
           </View>
 
           <View style={styles.cleaningStatus}>
@@ -175,6 +277,54 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  priceContainer: {
+    alignItems: 'flex-end',
+  },
+  price: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  priceLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  description: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  additionalInfo: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  amenities: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  amenityBadge: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  amenityText: {
+    fontSize: 12,
+    color: '#666',
+  },
   cleaningStatus: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -207,5 +357,24 @@ const styles = StyleSheet.create({
     color: '#d32f2f',
     textAlign: 'center',
     padding: 16,
+  },
+  roomFeatures: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  featureText: {
+    fontSize: 12,
+    color: '#666',
   },
 });
