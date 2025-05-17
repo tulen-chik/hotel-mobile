@@ -7,7 +7,7 @@ import {
   signOut
 } from 'firebase/auth';
 import { get, ref, set, update } from 'firebase/database';
-import { db } from './firebase/init';
+import { app, db } from './firebase/init';
 
 const USER_STORAGE_KEY = '@user';
 
@@ -119,7 +119,7 @@ export const registerUser = async (
       throw new Error('Пользователь с таким email уже существует');
     }
 
-    const auth = getAuth();
+    const auth = getAuth(app);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
  
@@ -176,7 +176,7 @@ export const loginUser = async (email: string, password: string): Promise<User> 
       throw new Error('Некорректный формат email. Пример: user@example.com');
     }
 
-    const auth = getAuth();
+    const auth = getAuth(app);
     try {
       console.log('[DEBUG] Attempting Firebase authentication');
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -226,7 +226,7 @@ export const loginUser = async (email: string, password: string): Promise<User> 
 };
 
 export const logoutUser = async (): Promise<void> => {
-  const auth = getAuth();
+  const auth = getAuth(app);
   await signOut(auth);
   await removeUserFromStorage();
 };
@@ -277,7 +277,7 @@ export const updateUserProfile = async (
 };
 
 export const getCurrentUser = async (): Promise<User | null> => {
-  const auth = getAuth();
+  const auth = getAuth(app);
   const user = auth.currentUser;
   if (!user) return null;
 
@@ -325,7 +325,7 @@ export const createUserByAdmin = async (
       throw new Error('Пользователь с таким email уже существует');
     }
 
-    const auth = getAuth();
+    const auth = getAuth(app);
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
  
     const user: User = {

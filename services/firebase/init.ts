@@ -1,5 +1,5 @@
-import { getApp, getApps, initializeApp } from 'firebase/app';
-import { getDatabase } from 'firebase/database';
+import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
+import { Database, getDatabase } from 'firebase/database';
 
 // Конфигурация Firebase
 const firebaseConfig = {
@@ -13,14 +13,14 @@ const firebaseConfig = {
     measurementId: "G-B802SQHC08"
   };
 
-let app;
+let app: FirebaseApp;
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);
 } else {
   app = getApp();
 }
 
-const db = getDatabase(app);
+const db: Database = getDatabase(app);
 
 export { app, db };
 
