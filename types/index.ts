@@ -13,8 +13,8 @@ export type User = {
   settings: UserSettings;
   pushToken?: string;
   phone?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export interface Room {
@@ -72,8 +72,8 @@ export type CleaningRequest = {
   status: 'pending' | 'approved' | 'rejected' | 'completed';
   requestType: 'regular' | 'urgent';
   notes?: string;
-  assignedTo?: string;
-  assignedAt?: Date;
+  assignedTo: string | null;
+  assignedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;

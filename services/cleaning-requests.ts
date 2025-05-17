@@ -34,46 +34,83 @@ export async function createCleaningRequest(
   requestType: 'regular' | 'urgent',
   notes?: string
 ): Promise<string> {
-  const requestsRef = ref(db, 'cleaning_requests');
-  const newRequestRef = push(requestsRef);
-  const requestId = newRequestRef.key!;
-  const now = new Date();
-  
-  // Пытаемся найти свободного уборщика
-  const availableCleaners = await getAvailableCleaners();
-  const assignedTo = availableCleaners.length > 0 ? availableCleaners[0] : undefined;
-  
-  const request: CleaningRequest = {
-    id: requestId,
+  console.log('Starting cleaning request creation:', {
     roomId,
     userId,
     reservationId,
-    status: 'pending',
     requestType,
-    notes,
-    assignedTo,
-    assignedAt: assignedTo ? now : undefined,
-    createdAt: now,
-    updatedAt: now
-  };
+    notes
+  });
 
-  await set(newRequestRef, request);
+  try {
+    // Check if the user has an active reservation for this room
+    console.log('Checking for active reservation...');
+    const hasReservation = await hasActiveReservation(roomId, userId);
+    console.log('Active reservation check result:', hasReservation);
 
-  // Отправляем уведомление уборщику, если он был назначен
-  if (assignedTo) {
-    await sendNotification([assignedTo], {
-      title: 'Новое задание на уборку',
-      body: `Вам назначена уборка комнаты ${roomId}`,
-      type: 'cleaning',
-      data: {
-        requestId,
-        roomId,
-        requestType
-      }
+    if (!hasReservation) {
+      console.error('No active reservation found for room:', roomId);
+      throw new Error('No active reservation found for this room');
+    }
+
+    console.log('Creating new cleaning request...');
+    const requestsRef = ref(db, 'cleaning_requests');
+    const newRequestRef = push(requestsRef);
+    const requestId = newRequestRef.key!;
+    const now = new Date();
+    
+    console.log('Finding available cleaners...');
+    // Пытаемся найти свободного уборщика
+    const availableCleaners = await getAvailableCleaners();
+    console.log('Available cleaners:', availableCleaners);
+    const assignedTo = availableCleaners.length > 0 ? availableCleaners[0] : null;
+    console.log('Assigned cleaner:', assignedTo);
+    
+    const request: CleaningRequest = {
+      id: requestId,
+      roomId,
+      userId,
+      reservationId,
+      status: 'pending',
+      requestType,
+      notes,
+      assignedTo,
+      assignedAt: assignedTo ? now : null,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    console.log('Saving cleaning request to database:', request);
+    await set(newRequestRef, request);
+    console.log('Cleaning request saved successfully');
+
+    // Отправляем уведомление уборщику, если он был назначен
+    if (assignedTo) {
+      console.log('Sending notification to assigned cleaner:', assignedTo);
+      await sendNotification([assignedTo], {
+        title: 'Новое задание на уборку',
+        body: `Вам назначена уборка комнаты ${roomId}`,
+        type: 'cleaning',
+        data: {
+          requestId,
+          roomId,
+          requestType
+        }
+      });
+      console.log('Notification sent successfully');
+    }
+
+    console.log('Cleaning request creation completed successfully');
+    return requestId;
+  } catch (error) {
+    console.error('Error in createCleaningRequest:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      params: { roomId, userId, reservationId, requestType, notes }
     });
+    throw error;
   }
-
-  return requestId;
 }
 
 // Назначить уборщика на запрос
@@ -108,6 +145,7 @@ export const subscribeToCleaningRequests = (
     status?: CleaningRequest['status'];
     roomId?: string;
     userId?: string;
+    assignedTo?: string;
   } | undefined,
   onUpdate: (requests: CleaningRequest[]) => void
 ) => {
@@ -134,6 +172,9 @@ export const subscribeToCleaningRequests = (
       }
       if (filters.userId) {
         requests = requests.filter(req => req.userId === filters.userId);
+      }
+      if (filters.assignedTo) {
+        requests = requests.filter(req => req.assignedTo === filters.assignedTo);
       }
     }
 
@@ -180,13 +221,47 @@ export async function updateCleaningRequestStatus(
 }
 
 // Проверить, есть ли активная резервация для комнаты
-export async function hasActiveReservation(roomId: string): Promise<boolean> {
-  const reservationsRef = ref(db, 'reservations');
-  const snapshot = await get(reservationsRef);
-  if (!snapshot.exists()) return false;
+export async function hasActiveReservation(roomId: string, userId?: string): Promise<boolean> {
+  console.log('Checking active reservation:', { roomId, userId });
+  try {
+    const reservationsRef = ref(db, 'reservations');
+    const snapshot = await get(reservationsRef);
+    
+    if (!snapshot.exists()) {
+      console.log('No reservations found in database');
+      return false;
+    }
 
-  const reservations = snapshot.val();
-  return Object.values(reservations).some((res: any) => 
-    res.roomId === roomId && res.status === 'active'
-  );
+    const reservations = snapshot.val();
+    console.log('Found reservations:', Object.keys(reservations).length);
+
+    const hasReservation = Object.values(reservations).some((res: any) => {
+      const matches = 
+        res.roomId === roomId && 
+        res.status === 'active' &&
+        (!userId || res.userId === userId);
+      
+      if (matches) {
+        console.log('Found matching reservation:', {
+          id: res.id,
+          roomId: res.roomId,
+          userId: res.userId,
+          status: res.status
+        });
+      }
+      
+      return matches;
+    });
+
+    console.log('Active reservation check result:', hasReservation);
+    return hasReservation;
+  } catch (error) {
+    console.error('Error in hasActiveReservation:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      params: { roomId, userId }
+    });
+    throw error;
+  }
 } 

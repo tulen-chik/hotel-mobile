@@ -1,4 +1,5 @@
 import {
+  assignCleaner as assignCleanerService,
   createCleaningRequest,
   hasActiveReservation,
   subscribeToCleaningRequests,
@@ -42,7 +43,11 @@ export const CleaningRequestProvider: React.FC<{ children: React.ReactNode }> = 
     if (!user) return;
     try {
       setLoading(true);
-      const filters = user.role === 'admin' ? undefined : { userId: user.id };
+      const filters = user.role === 'admin' 
+        ? undefined 
+        : user.role === 'cleaner'
+          ? { assignedTo: user.id }
+          : { userId: user.id };
       return subscribeToCleaningRequests(filters, (data) => {
         setRequests(data);
         setLoading(false);
@@ -62,7 +67,7 @@ export const CleaningRequestProvider: React.FC<{ children: React.ReactNode }> = 
     if (!user) throw new Error('User not authenticated');
     
     try {
-      const hasReservation = await hasActiveReservation(roomId);
+      const hasReservation = await hasActiveReservation(roomId, user.id);
       if (!hasReservation) {
         throw new Error('No active reservation for this room');
       }
@@ -100,7 +105,7 @@ export const CleaningRequestProvider: React.FC<{ children: React.ReactNode }> = 
     }
     
     try {
-      await assignCleaner(requestId, cleanerId);
+      await assignCleanerService(requestId, cleanerId);
       await loadRequests();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to assign cleaner');

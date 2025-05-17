@@ -1,12 +1,38 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useCleaningRequest } from '@/contexts/CleaningRequestContext';
+import { subscribeToDoorStatus, toggleLight, unlockDoor } from '@/services/rooms';
+import { CleaningRequest } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function CleaningScreen() {
   const { user } = useAuth();
-  const { requests, loading } = useCleaningRequest();
+  const { requests, loading, updateRequestStatus } = useCleaningRequest();
   const router = useRouter();
+  const [doorStatuses, setDoorStatuses] = useState<Record<string, 'locked' | 'unlocked'>>({});
+  const [lightStatuses, setLightStatuses] = useState<Record<string, 'on' | 'off'>>({});
+
+  useEffect(() => {
+    if (user?.role === 'cleaner') {
+      // Подписываемся на статусы дверей для всех активных запросов
+      const unsubscribers = requests
+        .filter(req => ['pending', 'approved'].includes(req.status))
+        .map(request => 
+          subscribeToDoorStatus(request.roomId, (status) => {
+            setDoorStatuses(prev => ({
+              ...prev,
+              [request.roomId]: status
+            }));
+          })
+        );
+
+      return () => {
+        unsubscribers.forEach(unsubscribe => unsubscribe());
+      };
+    }
+  }, [user?.role, requests]);
 
   if (!user) {
     return (
@@ -30,19 +56,132 @@ export default function CleaningScreen() {
     );
   }
 
+  // Фильтруем запросы в зависимости от роли пользователя
+  const filteredRequests = user.role === 'cleaner' 
+    ? requests.filter(request => request.assignedTo === user.id)
+    : requests;
+
+  const handleStatusUpdate = async (requestId: string, newStatus: CleaningRequest['status']) => {
+    try {
+      await updateRequestStatus(requestId, newStatus);
+    } catch (error) {
+      Alert.alert('Ошибка', 'Не удалось обновить статус запроса');
+    }
+  };
+
+  const handleUnlockDoor = async (roomId: string) => {
+    try {
+      await unlockDoor(roomId, user.id);
+    } catch (error) {
+      Alert.alert('Ошибка', 'Не удалось разблокировать дверь');
+    }
+  };
+
+  const handleToggleLight = async (roomId: string) => {
+    try {
+      await toggleLight(roomId, user.id);
+      setLightStatuses(prev => ({
+        ...prev,
+        [roomId]: prev[roomId] === 'on' ? 'off' : 'on'
+      }));
+    } catch (error) {
+      Alert.alert('Ошибка', 'Не удалось переключить свет');
+    }
+  };
+
+  const getStatusActions = (request: CleaningRequest) => {
+    if (user.role !== 'cleaner' || request.status === 'completed' || request.status === 'rejected') {
+      return null;
+    }
+
+    return (
+      <View style={styles.actionButtons}>
+        {request.status === 'pending' && (
+          <>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.approveButton]}
+              onPress={() => handleStatusUpdate(request.id, 'approved')}
+            >
+              <Ionicons name="checkmark-circle-outline" size={20} color="#2e7d32" />
+              <Text style={[styles.actionButtonText, styles.approveButtonText]}>Принять</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.rejectButton]}
+              onPress={() => handleStatusUpdate(request.id, 'rejected')}
+            >
+              <Ionicons name="close-circle-outline" size={20} color="#d32f2f" />
+              <Text style={[styles.actionButtonText, styles.rejectButtonText]}>Отклонить</Text>
+            </TouchableOpacity>
+          </>
+        )}
+        {request.status === 'approved' && (
+          <>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.completeButton]}
+              onPress={() => handleStatusUpdate(request.id, 'completed')}
+            >
+              <Ionicons name="checkmark-done-circle-outline" size={20} color="#1976d2" />
+              <Text style={[styles.actionButtonText, styles.completeButtonText]}>Завершить</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                doorStatuses[request.roomId] === 'unlocked' ? styles.doorUnlockedButton : styles.doorLockedButton
+              ]}
+              onPress={() => handleUnlockDoor(request.roomId)}
+              disabled={doorStatuses[request.roomId] === 'unlocked'}
+            >
+              <Ionicons 
+                name={doorStatuses[request.roomId] === 'unlocked' ? 'lock-open-outline' : 'lock-closed-outline'} 
+                size={20} 
+                color={doorStatuses[request.roomId] === 'unlocked' ? '#2e7d32' : '#666'} 
+              />
+              <Text style={[
+                styles.actionButtonText,
+                doorStatuses[request.roomId] === 'unlocked' ? styles.doorUnlockedText : styles.doorLockedText
+              ]}>
+                {doorStatuses[request.roomId] === 'unlocked' ? 'Дверь разблокирована' : 'Разблокировать дверь'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.lightButton]}
+              onPress={() => handleToggleLight(request.roomId)}
+            >
+              <Ionicons 
+                name={lightStatuses[request.roomId] === 'on' ? 'bulb' : 'bulb-outline'} 
+                size={20} 
+                color={lightStatuses[request.roomId] === 'on' ? '#2e7d32' : '#666'} 
+              />
+              <Text style={[
+                styles.actionButtonText,
+                lightStatuses[request.roomId] === 'on' ? styles.lightOnText : styles.lightOffText
+              ]}>
+                {lightStatuses[request.roomId] === 'on' ? 'Включено' : 'Выключено'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  };
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Запросы на уборку</Text>
+        <Text style={styles.title}>
+          {user.role === 'cleaner' ? 'Задания на уборку' : 'Запросы на уборку'}
+        </Text>
       </View>
 
-      {requests.length === 0 ? (
+      {filteredRequests.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>У вас нет запросов на уборку</Text>
+          <Text style={styles.emptyText}>
+            {user.role === 'cleaner' ? 'У вас нет заданий на уборку' : 'У вас нет запросов на уборку'}
+          </Text>
         </View>
       ) : (
         <View style={styles.requestsList}>
-          {requests.map((request) => (
+          {filteredRequests.map((request) => (
             <View key={request.id} style={styles.requestCard}>
               <View style={styles.requestHeader}>
                 <Text style={styles.requestType}>
@@ -69,11 +208,13 @@ export default function CleaningScreen() {
               <Text style={styles.requestDate}>
                 Создано: {new Date(request.createdAt).toLocaleDateString()}
               </Text>
+
+              {getStatusActions(request)}
             </View>
           ))}
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -147,24 +288,18 @@ const styles = StyleSheet.create({
   },
   requestStatus: {
     fontSize: 14,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    fontWeight: '500',
   },
   statusCompleted: {
-    backgroundColor: '#e8f5e9',
     color: '#2e7d32',
   },
   statusPending: {
-    backgroundColor: '#fff3e0',
     color: '#f57c00',
   },
   statusApproved: {
-    backgroundColor: '#e3f2fd',
     color: '#1976d2',
   },
   statusRejected: {
-    backgroundColor: '#ffebee',
     color: '#d32f2f',
   },
   requestNotes: {
@@ -175,5 +310,63 @@ const styles = StyleSheet.create({
   requestDate: {
     fontSize: 12,
     color: '#999',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 4,
+    flex: 1,
+    minWidth: '45%',
+    justifyContent: 'center',
+  },
+  actionButtonText: {
+    marginLeft: 4,
+    fontSize: 14,
+  },
+  approveButton: {
+    backgroundColor: '#e8f5e9',
+  },
+  approveButtonText: {
+    color: '#2e7d32',
+  },
+  rejectButton: {
+    backgroundColor: '#ffebee',
+  },
+  rejectButtonText: {
+    color: '#d32f2f',
+  },
+  completeButton: {
+    backgroundColor: '#e3f2fd',
+  },
+  completeButtonText: {
+    color: '#1976d2',
+  },
+  doorLockedButton: {
+    backgroundColor: '#fff3e0',
+  },
+  doorUnlockedButton: {
+    backgroundColor: '#e8f5e9',
+  },
+  doorLockedText: {
+    color: '#666',
+  },
+  doorUnlockedText: {
+    color: '#2e7d32',
+  },
+  lightButton: {
+    backgroundColor: '#f3e5f5',
+  },
+  lightOnText: {
+    color: '#2e7d32',
+  },
+  lightOffText: {
+    color: '#666',
   },
 }); 

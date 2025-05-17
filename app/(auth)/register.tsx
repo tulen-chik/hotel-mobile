@@ -1,29 +1,37 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import React, { useState } from 'react';
+import { ActivityIndicator, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function RegisterScreen() {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [error, setError] = useState('');
-  const { register } = useAuth();
-  const router = useRouter();
+  const { register, loading, error } = useAuth();
 
   const handleRegister = async () => {
     try {
       await register(email, password, name, phone);
-      router.replace('/(tabs)');
+      router.dismiss();
     } catch (err) {
-      setError('Ошибка при регистрации');
+      // Error is handled by the auth context
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.form}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity 
+          onPress={() => router.dismiss()}
+          style={styles.closeButton}
+        >
+          <Ionicons name="close" size={24} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.content}>
         <Text style={styles.title}>Регистрация</Text>
         
         <TextInput
@@ -32,7 +40,7 @@ export default function RegisterScreen() {
           value={name}
           onChangeText={setName}
         />
-        
+
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -44,34 +52,42 @@ export default function RegisterScreen() {
         
         <TextInput
           style={styles.input}
-          placeholder="Телефон"
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-        />
-        
-        <TextInput
-          style={styles.input}
           placeholder="Пароль"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
         />
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        
-        <TouchableOpacity style={styles.button} onPress={handleRegister}>
-          <Text style={styles.buttonText}>Зарегистрироваться</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Телефон (необязательно)"
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+        />
+
+        {error && <Text style={styles.error}>{error}</Text>}
+
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={handleRegister}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Зарегистрироваться</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.loginLink} 
-          onPress={() => router.replace('/(auth)/login')}
+          onPress={() => router.push('/login')}
+          style={styles.linkButton}
         >
-          <Text style={styles.loginLinkText}>Уже есть аккаунт? Войти</Text>
+          <Text style={styles.linkText}>Уже есть аккаунт? Войти</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -79,37 +95,38 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    justifyContent: 'center',
-    padding: 20,
   },
-  form: {
-    backgroundColor: '#fff',
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  closeButton: {
+    padding: 8,
+  },
+  content: {
+    flex: 1,
     padding: 20,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    justifyContent: 'center',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 20,
+    marginBottom: 30,
     textAlign: 'center',
   },
   input: {
-    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
     padding: 15,
-    borderRadius: 5,
-    marginBottom: 10,
+    borderRadius: 8,
+    marginBottom: 15,
     fontSize: 16,
   },
   button: {
-    backgroundColor: '#000',
+    backgroundColor: '#007AFF',
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 8,
     alignItems: 'center',
     marginTop: 10,
   },
@@ -119,16 +136,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   error: {
-    color: '#ff0000',
+    color: 'red',
     marginBottom: 10,
     textAlign: 'center',
   },
-  loginLink: {
-    marginTop: 15,
+  linkButton: {
+    marginTop: 20,
     alignItems: 'center',
   },
-  loginLinkText: {
-    color: '#666',
-    fontSize: 14,
+  linkText: {
+    color: '#007AFF',
+    fontSize: 16,
   },
 }); 

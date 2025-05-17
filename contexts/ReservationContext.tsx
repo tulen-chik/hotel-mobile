@@ -27,32 +27,52 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [error, setError] = useState<string | null>(null);
 
   const fetchReservations = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user found, skipping reservation fetch');
+      return;
+    }
+    console.log('Fetching reservations for user:', user.id);
     setLoading(true);
     setError(null);
     try {
       const unsubscribe = subscribeToUserReservations(user.uid, (reservations) => {
-        console.log('Received reservations:', reservations);
+        console.log('Received reservations update:', {
+          count: reservations.length,
+          reservations: reservations.map(r => ({
+            id: r.id,
+            status: r.status,
+            roomId: r.roomId
+          }))
+        });
         setReservations(reservations);
         setLoading(false);
       });
       return unsubscribe;
     } catch (err) {
-      console.error('Error fetching reservations:', err);
+      console.error('Error fetching reservations:', {
+        error: err,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined
+      });
       setError('Ошибка загрузки резерваций');
       setLoading(false);
     }
   };
 
   const addReservation = async (data: Omit<Reservation, 'id' | 'createdAt' | 'updatedAt' | 'status'>) => {
+    console.log('Adding new reservation:', data);
     try {
       setLoading(true);
-      console.log('Creating reservation with data:', data);
       const reservationId = await createReservation(data);
       console.log('Created reservation with ID:', reservationId);
       await fetchReservations();
     } catch (err) {
-      console.error('Error creating reservation:', err);
+      console.error('Error creating reservation:', {
+        error: err,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+        data
+      });
       setError('Ошибка создания резервации');
       throw err;
     } finally {
@@ -61,12 +81,19 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const cancel = async (id: string) => {
+    console.log('Cancelling reservation:', id);
     try {
       setLoading(true);
       await cancelReservation(id);
+      console.log('Reservation cancelled successfully');
       await fetchReservations();
     } catch (err) {
-      console.error('Error cancelling reservation:', err);
+      console.error('Error cancelling reservation:', {
+        error: err,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+        reservationId: id
+      });
       setError('Ошибка отмены резервации');
       throw err;
     } finally {
@@ -75,12 +102,19 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const complete = async (id: string) => {
+    console.log('Completing reservation:', id);
     try {
       setLoading(true);
       await completeReservation(id);
+      console.log('Reservation completed successfully');
       await fetchReservations();
     } catch (err) {
-      console.error('Error completing reservation:', err);
+      console.error('Error completing reservation:', {
+        error: err,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+        reservationId: id
+      });
       setError('Ошибка завершения резервации');
       throw err;
     } finally {
@@ -89,12 +123,15 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   useEffect(() => {
+    console.log('ReservationProvider mounted/updated, user:', user?.id);
     let unsubscribe: (() => void) | undefined;
 
     const setupSubscription = async () => {
       if (user) {
+        console.log('Setting up reservations subscription for user:', user.id);
         unsubscribe = await fetchReservations();
       } else {
+        console.log('No user, clearing reservations');
         setReservations([]);
       }
     };
@@ -103,6 +140,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     return () => {
       if (unsubscribe) {
+        console.log('Cleaning up reservations subscription');
         unsubscribe();
       }
     };

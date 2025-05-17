@@ -39,10 +39,33 @@ const collections = {
         checkOut: 'timestamp'
       },
       lastCleaned: 'timestamp',
-      cleaningStatus: 'string' // 'clean' | 'needs_cleaning' | 'in_progress'
+      cleaningStatus: 'string', // 'clean' | 'needs_cleaning' | 'in_progress'
+      // Новые поля для управления комнатой
+      doorStatus: 'string', // 'locked' | 'unlocked'
+      lightStatus: 'string', // 'on' | 'off'
+      humidity: 'number', // значение влажности в процентах
+      doorActions: {
+        type: 'map',
+        fields: {
+          action: 'string', // 'unlock' | 'lock' | 'auto_lock'
+          userId: 'string',
+          userName: 'string',
+          timestamp: 'timestamp',
+          type: 'string' // 'manual' | 'auto'
+        }
+      },
+      lastDoorAction: {
+        action: 'string',
+        userId: 'string',
+        userName: 'string',
+        timestamp: 'timestamp',
+        type: 'string'
+      }
     },
     indexes: [
-      { fields: ['isOccupied', 'number'], type: 'ascending' }
+      { fields: ['isOccupied', 'number'], type: 'ascending' },
+      { fields: ['doorStatus', 'number'], type: 'ascending' },
+      { fields: ['cleaningStatus', 'number'], type: 'ascending' }
     ]
   },
   cleaning_records: {
@@ -125,20 +148,15 @@ export const initializeFirebaseSchemas = async () => {
       const snapshot = await get(collectionRef);
       
       if (!snapshot.exists()) {
-        // Создаем тестовый документ для инициализации коллекции
-        await set(collectionRef, {
-          _schema: schema.fields,
-          _indexes: schema.indexes,
-          _createdAt: new Date()
-        });
-        
-        console.log(`Collection ${collectionName} initialized with schema`);
+        // Создаем пустую коллекцию без тестовых данных
+        await set(collectionRef, {});
+        console.log(`Collection ${collectionName} initialized`);
       }
     }
     
-    console.log('All Firebase schemas and indexes initialized successfully');
+    console.log('All Firebase collections initialized successfully');
   } catch (error) {
-    console.error('Error initializing Firebase schemas:', error);
+    console.error('Error initializing Firebase collections:', error);
     throw error;
   }
 }; 

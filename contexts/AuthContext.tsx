@@ -7,8 +7,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string, phone?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  register: (email: string, password: string, name: string, phone?: string) => Promise<User>;
   createUser: (email: string, password: string, name: string, role: 'user' | 'cleaner' | 'admin', phone?: string) => Promise<User>;
   logout: () => Promise<void>;
   updateSettings: (settings: UserSettings) => Promise<void>;
@@ -63,101 +63,139 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      setError(null);
       const userData = await loginUser(email, password);
       setUser(userData);
       authCallbacks.forEach(callback => callback(userData));
+      return userData;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      const errorMessage = err instanceof Error ? err.message : 'Ошибка при входе';
+      setError(errorMessage);
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const register = async (email: string, password: string, name: string, phone?: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const userData = await registerUser(email, password, name, 'user', phone);
-      setUser(userData);
-      authCallbacks.forEach(callback => callback(userData));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+  const register = (
+    email: string, 
+    password: string, 
+    name: string, 
+    phone?: string
+  ) => {
+    setLoading(true);
+    setError(null);
+    
+    return registerUser(email, password, name, 'user', phone)
+      .then((userData) => {
+        setUser(userData);
+        authCallbacks.forEach(callback => callback(userData));
+        return userData;
+      })
+      .catch((err) => {
+        const errorMessage = err instanceof Error ? err.message : 'Ошибка при регистрации';
+        setError(errorMessage);
+        throw err;
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
-  const logout = async () => {
-    try {
-      setLoading(true);
-      await logoutUser();
-      setUser(null);
-      authCallbacks.forEach(callback => callback(null));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Logout failed');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+  const logout = () => {
+    setLoading(true);
+    setError(null);
+    
+    return logoutUser()
+      .then(() => {
+        setUser(null);
+        authCallbacks.forEach(callback => callback(null));
+      })
+      .catch((err) => {
+        const errorMessage = err instanceof Error ? err.message : 'Ошибка при выходе';
+        setError(errorMessage);
+        throw err;
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
-  const updateSettings = async (settings: UserSettings) => {
-    if (!user) return;
-    try {
-      setLoading(true);
-      const updatedUser = { ...user, settings };
-      await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update settings');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+  const updateSettings = (settings: UserSettings) => {
+    if (!user) return Promise.reject(new Error('Пользователь не авторизован'));
+    
+    setLoading(true);
+    setError(null);
+    
+    const updatedUser = { ...user, settings };
+    
+    return Promise.resolve()
+      .then(() => AsyncStorage.setItem('@user', JSON.stringify(updatedUser)))
+      .then(() => {
+        setUser(updatedUser);
+      })
+      .catch((err) => {
+        const errorMessage = err instanceof Error ? err.message : 'Ошибка при обновлении настроек';
+        setError(errorMessage);
+        throw err;
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
-  const updateUser = async (data: Partial<User>) => {
-    if (!user) return;
-    try {
-      setLoading(true);
-      await updateUserProfile(user.uid, data);
-      const updatedUser = { ...user, ...data };
-      await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update user');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+  const updateUser = (data: Partial<User>) => {
+    if (!user) return Promise.reject(new Error('Пользователь не авторизован'));
+    
+    setLoading(true);
+    setError(null);
+    
+    return updateUserProfile(user.uid, data)
+      .then(() => {
+        const updatedUser = { ...user, ...data };
+        return AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
+      })
+      .then(() => {
+        setUser({ ...user, ...data });
+      })
+      .catch((err) => {
+        const errorMessage = err instanceof Error ? err.message : 'Ошибка при обновлении пользователя';
+        setError(errorMessage);
+        throw err;
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
-  const createUser = async (
+  const createUser = (
     email: string,
     password: string,
     name: string,
     role: 'user' | 'cleaner' | 'admin',
     phone?: string
-  ): Promise<User> => {
+  ) => {
     if (!user || user.role !== 'admin') {
-      throw new Error('Only administrators can create users');
+      const errorMessage = 'Только администраторы могут создавать пользователей';
+      setError(errorMessage);
+      return Promise.reject(new Error(errorMessage));
     }
-    try {
-      setLoading(true);
-      setError(null);
-      const newUser = await createUserByAdmin(email, password, name, role, phone);
-      return newUser;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create user');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+    
+    setLoading(true);
+    setError(null);
+    
+    return createUserByAdmin(email, password, name, role, phone)
+      .catch((err) => {
+        const errorMessage = err instanceof Error ? err.message : 'Ошибка при создании пользователя';
+        setError(errorMessage);
+        throw err;
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   const value = {

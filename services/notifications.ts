@@ -213,17 +213,41 @@ export async function notifyNewReservation(reservation: Reservation) {
     const admins = await getAdmins();
     const adminIds = admins.map(admin => admin.id);
 
-    await sendNotification(adminIds, {
-      title: 'Новая резервация',
-      body: `Создана новая резервация для комнаты ${reservation.roomId}`,
-      type: 'reservation',
-      data: {
-        reservationId: reservation.id,
-        roomId: reservation.roomId,
-        checkIn: reservation.checkIn,
-        checkOut: reservation.checkOut
-      }
+    // Создаем уведомление для каждого администратора
+    const notificationPromises = adminIds.map(async (adminId) => {
+      const notification = {
+        userId: adminId,
+        title: 'Новая резервация',
+        body: `Создана новая резервация для комнаты ${reservation.roomId}`,
+        type: 'reservation' as const,
+        data: {
+          reservationId: reservation.id,
+          roomId: reservation.roomId,
+          checkIn: reservation.checkIn,
+          checkOut: reservation.checkOut
+        },
+        read: false
+      };
+
+      // Сохраняем уведомление в базу данных
+      await addNotification(notification);
     });
+
+    // Ждем сохранения всех уведомлений
+    await Promise.all(notificationPromises);
+
+    // Отправляем push и email уведомления
+    // await sendNotification(adminIds, {
+    //   title: 'Новая резервация',
+    //   body: `Создана новая резервация для комнаты ${reservation.roomId}`,
+    //   type: 'reservation',
+    //   data: {
+    //     reservationId: reservation.id,
+    //     roomId: reservation.roomId,
+    //     checkIn: reservation.checkIn,
+    //     checkOut: reservation.checkOut
+    //   }
+    // });
   } catch (error) {
     console.error('Error sending reservation notification:', error);
     throw error;

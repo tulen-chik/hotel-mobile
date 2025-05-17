@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "HelloWorld",
-    "slug": "expo-template-default",
+    "slug": "hotel-client",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.eugene6886.hotelclient"
     },
     "web": {
       "bundler": "metro",
@@ -38,6 +39,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e5f9d1b7-05bd-4fbd-b28a-52930b1c3493"
+      }
+    },
+    "owner": "eugene6886"
   }
 }
