@@ -1,7 +1,7 @@
 import { User } from '@/types';
-import { get, ref, set, update, remove, onValue, off } from 'firebase/database';
-import { db } from './firebase/config';
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { get, off, onValue, ref, remove, set, update } from 'firebase/database';
+import { db } from './firebase/init';
 
 interface CreateUserData extends Omit<User, 'id' | 'uid'> {
   password: string;

@@ -1,6 +1,6 @@
 import { Notification, Reservation, User } from '@/types';
 import { get, onValue, push, ref, remove, set, update } from 'firebase/database';
-import { db } from './firebase/config';
+import { db } from './firebase/init';
 
 // Сохранить push-токен пользователя
 export async function savePushToken(userId: string, token: string) {

@@ -9,7 +9,7 @@ import {
   update
 } from 'firebase/database';
 import { Reservation } from '../types';
-import { db } from './firebase/config';
+import { db } from './firebase/init';
 import { notifyNewReservation } from './notifications';
 
 // Room Management

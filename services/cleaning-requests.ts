@@ -1,6 +1,6 @@
 import { CleaningRequest } from '@/types';
 import { get, onValue, push, ref, set, update } from 'firebase/database';
-import { db } from './firebase/config';
+import { db } from './firebase/init';
 import { sendNotification } from './notifications';
 
 // Получить свободных уборщиков

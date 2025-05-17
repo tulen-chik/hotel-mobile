@@ -1,5 +1,5 @@
 import { get, ref, set } from 'firebase/database';
-import { db } from './config';
+import { db } from './init';
 
 // Определение схем коллекций
 const collections = {

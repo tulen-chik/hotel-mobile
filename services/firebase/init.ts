@@ -1,6 +1,5 @@
-import { initializeApp } from 'firebase/app';
+import { getApp, getApps, initializeApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
-import { initializeFirebaseSchemas } from './schemas';
 
 // Конфигурация Firebase
 const firebaseConfig = {
@@ -14,19 +13,14 @@ const firebaseConfig = {
     measurementId: "G-B802SQHC08"
   };
 
-export const initializeFirebase = async () => {
-  try {
-    // Инициализация Firebase
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    
-    // Инициализация схем
-    await initializeFirebaseSchemas();
-    
-    console.log('Firebase initialized successfully');
-    return { app, db };
-  } catch (error) {
-    console.error('Error initializing Firebase:', error);
-    throw error;
-  }
-}; 
+let app;
+if (!getApps().length) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApp();
+}
+
+const db = getDatabase(app);
+
+export { app, db };
+

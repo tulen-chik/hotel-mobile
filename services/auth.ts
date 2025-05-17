@@ -7,7 +7,7 @@ import {
   signOut
 } from 'firebase/auth';
 import { get, ref, set, update } from 'firebase/database';
-import { db } from './firebase/config';
+import { db } from './firebase/init';
 
 const USER_STORAGE_KEY = '@user';
 
