@@ -4,21 +4,30 @@ import React, { useState } from 'react';
 import { ActivityIndicator, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
+type UserRole = 'user' | 'cleaner' | 'repairer';
+
 export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [role, setRole] = useState<UserRole>('user');
   const { register, loading, error } = useAuth();
 
   const handleRegister = async () => {
     try {
-      await register(email, password, name, phone);
+      await register(email, password, name, phone, role);
       router.dismiss();
     } catch (err) {
       // Error is handled by the auth context
     }
   };
+
+  const roles: { value: UserRole; label: string }[] = [
+    { value: 'user', label: 'Гость' },
+    { value: 'cleaner', label: 'Уборщик' },
+    { value: 'repairer', label: 'Ремонтник' },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -65,6 +74,29 @@ export default function RegisterScreen() {
           onChangeText={setPhone}
           keyboardType="phone-pad"
         />
+
+        <Text style={styles.sectionTitle}>Выберите роль:</Text>
+        <View style={styles.roleContainer}>
+          {roles.map((r) => (
+            <TouchableOpacity
+              key={r.value}
+              style={[
+                styles.roleButton,
+                role === r.value && styles.selectedRoleButton,
+              ]}
+              onPress={() => setRole(r.value)}
+            >
+              <Text
+                style={[
+                  styles.roleButtonText,
+                  role === r.value && styles.selectedRoleButtonText,
+                ]}
+              >
+                {r.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {error && <Text style={styles.error}>{error}</Text>}
 
@@ -150,5 +182,38 @@ const styles = StyleSheet.create({
     color: '#222',
     fontSize: 15,
     marginTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 22,
+  },
+  roleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d1d1',
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  selectedRoleButton: {
+    backgroundColor: '#5d3472',
+    borderColor: '#5d3472',
+  },
+  roleButtonText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  selectedRoleButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
 }); 

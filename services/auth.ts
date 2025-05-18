@@ -89,7 +89,7 @@ export const registerUser = async (
   email: string,
   password: string,
   name: string,
-  role: 'user',
+  role: 'user' | 'cleaner' | 'repairer' | 'admin' = 'user',
   phone?: string
 ): Promise<User> => {
   try {

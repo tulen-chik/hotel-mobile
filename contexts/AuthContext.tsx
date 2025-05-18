@@ -8,7 +8,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<User>;
-  register: (email: string, password: string, name: string, phone?: string) => Promise<User>;
+  register: (email: string, password: string, name: string, phone?: string, role?: 'user' | 'cleaner' | 'repairer') => Promise<User>;
   createUser: (email: string, password: string, name: string, role: 'user' | 'cleaner' | 'admin', phone?: string) => Promise<User>;
   logout: () => Promise<void>;
   updateSettings: (settings: UserSettings) => Promise<void>;
@@ -85,12 +85,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email: string, 
     password: string, 
     name: string, 
-    phone?: string
+    phone?: string,
+    role: 'user' | 'cleaner' | 'repairer' = 'user'
   ) => {
     setLoading(true);
     setError(null);
     
-    return registerUser(email, password, name, 'user', phone)
+    return registerUser(email, password, name, role, phone)
       .then((userData) => {
         setUser(userData);
         authCallbacks.forEach(callback => callback(userData));

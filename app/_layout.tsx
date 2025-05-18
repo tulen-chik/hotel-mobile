@@ -13,7 +13,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeApp } from '@/services/firebase/initialize';
 
 function RootLayoutNav() {
-  const { user, isCleaner } = useAuth();
+  const { user, isCleaner, isRepairer } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -21,6 +21,8 @@ function RootLayoutNav() {
       router.replace('/(tabs)' as any);
     } else if (isCleaner) {
       router.replace('/(cleaner)' as any);
+    } else if (isRepairer) {
+      router.replace('/(repairer)' as any);
     } else {
       router.replace('/(user)' as any);
     }
@@ -32,6 +34,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(user)" />
       <Stack.Screen name="(cleaner)" />
+      <Stack.Screen name="(repairer)" />
     </Stack>
   );
 }
