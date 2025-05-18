@@ -1,5 +1,4 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
 import { initializeFirebaseSchemas } from './schemas';
 
@@ -18,9 +17,8 @@ const firebaseConfig = {
 // Инициализация Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const auth = getAuth(app);
 
-export { app, auth, db };
+export { app, db };
 
 export const initializeFirebase = async () => {
   try {
@@ -28,7 +26,7 @@ export const initializeFirebase = async () => {
     await initializeFirebaseSchemas();
     
     console.log('Firebase initialized successfully');
-    return { app, db, auth };
+    return { app, db };
   } catch (error) {
     console.error('Error initializing Firebase:', error);
     throw error;

@@ -1,5 +1,5 @@
 import { User } from '@/types';
-import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import CryptoJS from 'crypto-js';
 import { get, off, onValue, ref, remove, set, update } from 'firebase/database';
 import { db } from './firebase/init';
 
@@ -52,21 +52,18 @@ export const getUsers = async (): Promise<User[]> => {
 
 export const createUser = async (userData: CreateUserData): Promise<User> => {
   try {
-    const auth = getAuth();
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      userData.email,
-      userData.password
-    );
+    const hashedPassword = CryptoJS.SHA256(userData.password).toString();
+    const userId = CryptoJS.lib.WordArray.random(16).toString();
 
     const { password, ...userWithoutPassword } = userData;
     const newUser: User = {
-      id: userCredential.user.uid,
-      uid: userCredential.user.uid,
+      id: userId,
+      uid: userId,
       ...userWithoutPassword,
+      password: hashedPassword,
     };
 
-    await set(ref(db, `users/${userCredential.user.uid}`), newUser);
+    await set(ref(db, `users/${userId}`), newUser);
     return newUser;
   } catch (error) {
     console.error('Error creating user:', error);
