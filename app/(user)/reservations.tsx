@@ -1,22 +1,25 @@
 import LoginPrompt from '@/components/LoginPrompt';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCleaningRequest } from '@/contexts/CleaningRequestContext';
+import { useRepair } from '@/contexts/RepairContext';
 import { useReservations } from '@/contexts/ReservationContext';
 import { useRooms } from '@/contexts/RoomContext';
 import { Reservation } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function ReservationsScreen() {
   const { user } = useAuth();
   const { reservations, loading, error, cancel } = useReservations();
   const { getRoom } = useRooms();
   const { createRequest } = useCleaningRequest();
+  const { createRequest: createRepairRequest } = useRepair();
   const router = useRouter();
   const [rooms, setRooms] = useState<Record<string, any>>({});
   const [showCleaningModal, setShowCleaningModal] = useState(false);
+  const [showRepairModal, setShowRepairModal] = useState(false);
   const [showDoorModal, setShowDoorModal] = useState(false);
   const [showLightModal, setShowLightModal] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
@@ -24,6 +27,9 @@ export default function ReservationsScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [doorLocked, setDoorLocked] = useState(true);
   const [lightsOn, setLightsOn] = useState(false);
+  const [repairType, setRepairType] = useState<'plumbing' | 'electrical' | 'furniture' | 'other'>('plumbing');
+  const [repairDescription, setRepairDescription] = useState('');
+  const [repairPriority, setRepairPriority] = useState<'low' | 'medium' | 'high'>('medium');
 
   if (!user) {
     return <LoginPrompt message="Для просмотра резерваций необходимо войти в систему" />;
@@ -141,6 +147,25 @@ export default function ReservationsScreen() {
       Alert.alert('Успех', 'Запрос на уборку создан');
     } catch (error) {
       Alert.alert('Ошибка', 'Не удалось создать запрос на уборку');
+    }
+  };
+
+  const handleRequestRepair = async () => {
+    if (!selectedReservation) return;
+
+    try {
+      await createRepairRequest({
+        userId: user!.uid,
+        roomId: selectedReservation.roomId,
+        type: repairType,
+        description: repairDescription,
+        priority: repairPriority,
+        status: 'pending'
+      });
+      setShowRepairModal(false);
+      Alert.alert('Успех', 'Заявка на ремонт создана');
+    } catch (error) {
+      Alert.alert('Ошибка', 'Не удалось создать заявку на ремонт');
     }
   };
 
@@ -497,6 +522,17 @@ export default function ReservationsScreen() {
                         <Ionicons name="water-outline" size={16} color="#2196F3" />
                         <Text style={styles.controlButtonText}>Уборка</Text>
                       </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.controlButton, styles.smallButton]}
+                        onPress={() => {
+                          setSelectedReservation(reservation);
+                          setShowRepairModal(true);
+                        }}
+                      >
+                        <Ionicons name="construct-outline" size={16} color="#FFA000" />
+                        <Text style={styles.controlButtonText}>Ремонт</Text>
+                      </TouchableOpacity>
                     </View>
 
                     <TouchableOpacity
@@ -587,6 +623,142 @@ export default function ReservationsScreen() {
         <CleaningModal />
         <DoorControlModal />
         <LightControlModal />
+
+        {/* Модальное окно заявки на ремонт */}
+        <Modal
+          visible={showRepairModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowRepairModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Заявка на ремонт</Text>
+                <TouchableOpacity onPress={() => setShowRepairModal(false)}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.repairTypeSection}>
+                <Text style={styles.sectionTitle}>Тип проблемы</Text>
+                <View style={styles.repairTypeButtons}>
+                  <TouchableOpacity
+                    style={[
+                      styles.repairTypeButton,
+                      repairType === 'plumbing' && styles.selectedRepairType
+                    ]}
+                    onPress={() => setRepairType('plumbing')}
+                  >
+                    <Ionicons name="water-outline" size={24} color={repairType === 'plumbing' ? '#fff' : '#666'} />
+                    <Text style={[styles.repairTypeText, repairType === 'plumbing' && styles.selectedRepairTypeText]}>
+                      Сантехника
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.repairTypeButton,
+                      repairType === 'electrical' && styles.selectedRepairType
+                    ]}
+                    onPress={() => setRepairType('electrical')}
+                  >
+                    <Ionicons name="flash-outline" size={24} color={repairType === 'electrical' ? '#fff' : '#666'} />
+                    <Text style={[styles.repairTypeText, repairType === 'electrical' && styles.selectedRepairTypeText]}>
+                      Электрика
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.repairTypeButton,
+                      repairType === 'furniture' && styles.selectedRepairType
+                    ]}
+                    onPress={() => setRepairType('furniture')}
+                  >
+                    <Ionicons name="bed-outline" size={24} color={repairType === 'furniture' ? '#fff' : '#666'} />
+                    <Text style={[styles.repairTypeText, repairType === 'furniture' && styles.selectedRepairTypeText]}>
+                      Мебель
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.repairTypeButton,
+                      repairType === 'other' && styles.selectedRepairType
+                    ]}
+                    onPress={() => setRepairType('other')}
+                  >
+                    <Ionicons name="construct-outline" size={24} color={repairType === 'other' ? '#fff' : '#666'} />
+                    <Text style={[styles.repairTypeText, repairType === 'other' && styles.selectedRepairTypeText]}>
+                      Другое
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.prioritySection}>
+                <Text style={styles.sectionTitle}>Приоритет</Text>
+                <View style={styles.priorityButtons}>
+                  <TouchableOpacity
+                    style={[
+                      styles.priorityButton,
+                      repairPriority === 'low' && styles.selectedPriority
+                    ]}
+                    onPress={() => setRepairPriority('low')}
+                  >
+                    <Text style={[styles.priorityText, repairPriority === 'low' && styles.selectedPriorityText]}>
+                      Низкий
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.priorityButton,
+                      repairPriority === 'medium' && styles.selectedPriority
+                    ]}
+                    onPress={() => setRepairPriority('medium')}
+                  >
+                    <Text style={[styles.priorityText, repairPriority === 'medium' && styles.selectedPriorityText]}>
+                      Средний
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.priorityButton,
+                      repairPriority === 'high' && styles.selectedPriority
+                    ]}
+                    onPress={() => setRepairPriority('high')}
+                  >
+                    <Text style={[styles.priorityText, repairPriority === 'high' && styles.selectedPriorityText]}>
+                      Высокий
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.descriptionSection}>
+                <Text style={styles.sectionTitle}>Описание проблемы</Text>
+                <TextInput
+                  style={styles.descriptionInput}
+                  value={repairDescription}
+                  onChangeText={setRepairDescription}
+                  placeholder="Опишите проблему подробно..."
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={handleRequestRepair}
+              >
+                <Text style={styles.confirmButtonText}>Отправить заявку</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
       </ScrollView>
     </SafeAreaView>
@@ -820,6 +992,71 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     flex: 1,
+  },
+  repairTypeSection: {
+    marginBottom: 20,
+  },
+  repairTypeButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  repairTypeButton: {
+    flex: 1,
+    minWidth: '45%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    gap: 8,
+  },
+  selectedRepairType: {
+    backgroundColor: '#FFA000',
+  },
+  repairTypeText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  selectedRepairTypeText: {
+    color: '#fff',
+  },
+  prioritySection: {
+    marginBottom: 20,
+  },
+  priorityButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  priorityButton: {
+    flex: 1,
+    padding: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  selectedPriority: {
+    backgroundColor: '#FFA000',
+  },
+  priorityText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  selectedPriorityText: {
+    color: '#fff',
+  },
+  descriptionSection: {
+    marginBottom: 20,
+  },
+  descriptionInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+    minHeight: 100,
+    textAlignVertical: 'top',
   },
 });
 

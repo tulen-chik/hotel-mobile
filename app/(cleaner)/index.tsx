@@ -1,213 +1,305 @@
-import { useRooms } from '@/contexts/RoomContext';
-import { Room } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCleaningRequest } from '@/contexts/CleaningRequestContext';
+import { subscribeToDoorStatus } from '@/services/rooms';
+import { CleaningRequest } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export default function RoomsScreen() {
-  const { rooms, loading, error } = useRooms();
+export default function CleaningScreen() {
+  const { user } = useAuth();
+  if (!user || user.role !== 'cleaner') return null;
+  const { requests, loading, updateRequestStatus } = useCleaningRequest();
   const router = useRouter();
+  const [doorStatuses, setDoorStatuses] = useState<Record<string, 'locked' | 'unlocked'>>({});
+  const [lightStatuses, setLightStatuses] = useState<Record<string, 'on' | 'off'>>({});
 
-  const renderRoom = ({ item }: { item: Room }) => {
+  useEffect(() => {
+    if (user?.role === 'cleaner') {
+      // Подписываемся на статусы дверей для всех активных запросов
+      const unsubscribers = requests
+        .filter(req => ['pending', 'approved'].includes(req.status))
+        .map(request => 
+          subscribeToDoorStatus(request.roomId, (status) => {
+            setDoorStatuses(prev => ({
+              ...prev,
+              [request.roomId]: status
+            }));
+          })
+        );
+
+      return () => {
+        unsubscribers.forEach(unsubscribe => unsubscribe());
+      };
+    }
+  }, [user?.role, requests]);
+
+  if (!user) {
     return (
-      <TouchableOpacity
-        style={[styles.roomCard, item.isOccupied && styles.occupiedRoom]}
-        onPress={() => router.push({ pathname: '/room/[id]' as any, params: { id: item.id } })}
-      >
-        {item.imageUrl ? (
-          <Image 
-            source={{ uri: item.imageUrl }} 
-            style={styles.roomImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.roomImage, styles.placeholderImage]}>
-            <Ionicons name="bed-outline" size={32} color={item.isOccupied ? '#fff' : '#666'} />
-          </View>
-        )}
-        <View style={styles.roomContent}>
-          <View style={styles.roomHeader}>
-            <View style={styles.roomInfo}>
-              <Text style={[styles.roomNumber, item.isOccupied && styles.textWhite]}>
-                №{item.number}
-              </Text>
-              <View style={styles.roomDetails}>
-                <View style={styles.detailItem}>
-                  <Ionicons 
-                    name="bed-outline" 
-                    size={16} 
-                    color={item.isOccupied ? '#fff' : '#666'} 
-                  />
-                  <Text style={[styles.detailText, item.isOccupied && styles.textWhite]}>
-                    {item.beds} {item.beds === 1 ? 'кровать' : item.beds < 5 ? 'кровати' : 'кроватей'}
-                  </Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Ionicons 
-                    name="home-outline" 
-                    size={16} 
-                    color={item.isOccupied ? '#fff' : '#666'} 
-                  />
-                  <Text style={[styles.detailText, item.isOccupied && styles.textWhite]}>
-                    {item.rooms} {item.rooms === 1 ? 'комната' : item.rooms < 5 ? 'комнаты' : 'комнат'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-            <View style={styles.priceContainer}>
-              <Text style={[styles.price, item.isOccupied && styles.textWhite]}>
-                {item.price.perNight} {item.price.currency}
-              </Text>
-              <Text style={[styles.priceLabel, item.isOccupied && styles.textWhite]}>
-                за ночь
-              </Text>
-            </View>
-          </View>
-
-          <Text style={[styles.description, item.isOccupied && styles.textWhite]}>
-            {item.description}
-          </Text>
-
-          <View style={styles.additionalInfo}>
-            <View style={styles.infoItem}>
-              <Ionicons 
-                name="square-outline" 
-                size={16} 
-                color={item.isOccupied ? '#fff' : '#666'} 
-              />
-              <Text style={[styles.infoText, item.isOccupied && styles.textWhite]}>
-                {item.additionalInfo.area} м²
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Ionicons 
-                name="people-outline" 
-                size={16} 
-                color={item.isOccupied ? '#fff' : '#666'} 
-              />
-              <Text style={[styles.infoText, item.isOccupied && styles.textWhite]}>
-                до {item.additionalInfo.maxGuests} гостей
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Ionicons 
-                name={item.additionalInfo.view === 'sea' ? 'water-outline' : 
-                      item.additionalInfo.view === 'mountain' ? 'image-outline' :
-                      item.additionalInfo.view === 'garden' ? 'leaf-outline' : 'business-outline'} 
-                size={16} 
-                color={item.isOccupied ? '#fff' : '#666'} 
-              />
-              <Text style={[styles.infoText, item.isOccupied && styles.textWhite]}>
-                {item.additionalInfo.view === 'sea' ? 'Вид на море' :
-                 item.additionalInfo.view === 'mountain' ? 'Вид на горы' :
-                 item.additionalInfo.view === 'garden' ? 'Вид на сад' : 'Вид на город'}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.roomFeatures}>
-            <View style={styles.featureItem}>
-              <Ionicons 
-                name={item.additionalInfo.bedType === 'king' ? 'bed' : 
-                      item.additionalInfo.bedType === 'twin' ? 'bed-outline' :
-                      item.additionalInfo.bedType === 'single' ? 'bed-outline' : 'bed'} 
-                size={16} 
-                color={item.isOccupied ? '#fff' : '#666'} 
-              />
-              <Text style={[styles.featureText, item.isOccupied && styles.textWhite]}>
-                {item.additionalInfo.bedType === 'king' ? 'King-size кровать' :
-                 item.additionalInfo.bedType === 'twin' ? 'Две односпальные кровати' :
-                 item.additionalInfo.bedType === 'single' ? 'Односпальная кровать' : 'Двуспальная кровать'}
-              </Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Ionicons 
-                name={item.additionalInfo.bathroomType === 'private' ? 'water' : 'water-outline'} 
-                size={16} 
-                color={item.isOccupied ? '#fff' : '#666'} 
-              />
-              <Text style={[styles.featureText, item.isOccupied && styles.textWhite]}>
-                {item.additionalInfo.bathroomType === 'private' ? 'Собственная ванная' : 'Общая ванная'}
-              </Text>
-            </View>
-            {item.additionalInfo.smokingAllowed && (
-              <View style={styles.featureItem}>
-                <Ionicons name="flame" size={16} color={item.isOccupied ? '#fff' : '#666'} />
-                <Text style={[styles.featureText, item.isOccupied && styles.textWhite]}>
-                  Разрешено курение
-                </Text>
-              </View>
-            )}
-            {item.additionalInfo.petsAllowed && (
-              <View style={styles.featureItem}>
-                <Ionicons name="paw" size={16} color={item.isOccupied ? '#fff' : '#666'} />
-                <Text style={[styles.featureText, item.isOccupied && styles.textWhite]}>
-                  Разрешены питомцы
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.amenities}>
-            {item.additionalInfo?.amenities?.map((amenity, index) => (
-              <View key={index} style={styles.amenityBadge}>
-                <Text style={[styles.amenityText, item.isOccupied && styles.textWhite]}>
-                  {amenity}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.cleaningStatus}>
-            {item.currentGuest && (
-              <View style={styles.guestInfo}>
-                <Ionicons name="person-outline" size={16} color={item.isOccupied ? '#fff' : '#666'} />
-                <Text style={[styles.guestText, item.isOccupied && styles.textWhite]}>
-                  {item.currentGuest.name}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
+      <View style={styles.container}>
+        <Text style={styles.message}>Для просмотра запросов на уборку необходимо войти в систему</Text>
+        <TouchableOpacity 
+          style={styles.loginButton}
+          onPress={() => router.push('/(auth)/login')}
+        >
+          <Text style={styles.loginButtonText}>Войти</Text>
+        </TouchableOpacity>
+      </View>
     );
-  };
+  }
 
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#000" />
+        <Text>Загрузка...</Text>
       </View>
     );
   }
 
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
-    );
-  }
+  // Фильтруем запросы в зависимости от роли пользователя
+  const filteredRequests = user.role === 'cleaner' 
+    ? requests.filter(request => request.assignedTo === user.id)
+    : requests;
 
-  if (rooms.length === 0) {
+  const handleStatusUpdate = async (requestId: string, newStatus: CleaningRequest['status']) => {
+    try {
+      await updateRequestStatus(requestId, newStatus);
+    } catch (error) {
+      Alert.alert('Ошибка', 'Не удалось обновить статус запроса');
+    }
+  };
+
+  // --- Методы управления светом и дверью ---
+  const makeGetRequestLightsOn = async () => {
+    try {
+      const response = await fetch('http://192.168.43.141:8000/LightOn', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      return true;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return false;
+    }
+  };
+  const makeGetRequestLightsOff = async () => {
+    try {
+      const response = await fetch('http://192.168.43.141:8000/LightOff', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      return true;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return false;
+    }
+  };
+  const makeGetRequestDoorLockOpen = async () => {
+    try {
+      const response = await fetch('http://192.168.43.141:8000/DoorLockOpen', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      return true;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return false;
+    }
+  };
+  const makeGetRequestDoorLockClose = async () => {
+    try {
+      const response = await fetch('http://192.168.43.141:8000/DoorLockClose', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      return true;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return false;
+    }
+  };
+
+  // --- handleUnlockDoor ---
+  const handleUnlockDoor = async (roomId: string) => {
+    try {
+      const ok = await makeGetRequestDoorLockOpen();
+      if (ok) {
+        Alert.alert('Успех', 'Дверь разблокирована');
+      } else {
+        Alert.alert('Ошибка', 'Не удалось разблокировать дверь');
+      }
+    } catch (error) {
+      Alert.alert('Ошибка', 'Не удалось разблокировать дверь');
+    }
+  };
+  // --- handleToggleLight ---
+  const handleToggleLight = async (roomId: string) => {
+    try {
+      let ok = false;
+      if (lightStatuses[roomId] === 'on') {
+        ok = await makeGetRequestLightsOff();
+      } else {
+        ok = await makeGetRequestLightsOn();
+      }
+      setLightStatuses(prev => ({
+        ...prev,
+        [roomId]: prev[roomId] === 'on' ? 'off' : 'on'
+      }));
+      Alert.alert(ok ? 'Успех' : 'Ошибка', ok ? (lightStatuses[roomId] === 'on' ? 'Свет выключен' : 'Свет включен') : 'Не удалось переключить свет');
+    } catch (error) {
+      Alert.alert('Ошибка', 'Не удалось переключить свет');
+    }
+  };
+
+  const getStatusActions = (request: CleaningRequest) => {
+    if (user.role !== 'cleaner' || request.status === 'completed' || request.status === 'rejected') {
+      return null;
+    }
+
     return (
-      <View style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <Ionicons name="bed-outline" size={64} color="#666" />
-          <Text style={styles.emptyText}>Нет доступных номеров</Text>
-        </View>
+      <View style={styles.actionButtons}>
+        {request.status === 'pending' && (
+          <>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.approveButton]}
+              onPress={() => handleStatusUpdate(request.id, 'approved')}
+            >
+              <Ionicons name="checkmark-circle-outline" size={20} color="#2e7d32" />
+              <Text style={[styles.actionButtonText, styles.approveButtonText]}>Принять</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.rejectButton]}
+              onPress={() => handleStatusUpdate(request.id, 'rejected')}
+            >
+              <Ionicons name="close-circle-outline" size={20} color="#d32f2f" />
+              <Text style={[styles.actionButtonText, styles.rejectButtonText]}>Отклонить</Text>
+            </TouchableOpacity>
+          </>
+        )}
+        {request.status === 'approved' && (
+          <>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.completeButton]}
+              onPress={() => handleStatusUpdate(request.id, 'completed')}
+            >
+              <Ionicons name="checkmark-done-circle-outline" size={20} color="#1976d2" />
+              <Text style={[styles.actionButtonText, styles.completeButtonText]}>Завершить</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                doorStatuses[request.roomId] === 'unlocked' ? styles.doorUnlockedButton : styles.doorLockedButton
+              ]}
+              onPress={() => handleUnlockDoor(request.roomId)}
+              disabled={doorStatuses[request.roomId] === 'unlocked'}
+            >
+              <Ionicons 
+                name={doorStatuses[request.roomId] === 'unlocked' ? 'lock-open-outline' : 'lock-closed-outline'} 
+                size={20} 
+                color={doorStatuses[request.roomId] === 'unlocked' ? '#2e7d32' : '#666'} 
+              />
+              <Text style={[
+                styles.actionButtonText,
+                doorStatuses[request.roomId] === 'unlocked' ? styles.doorUnlockedText : styles.doorLockedText
+              ]}>
+                {doorStatuses[request.roomId] === 'unlocked' ? 'Дверь разблокирована' : 'Разблокировать дверь'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.lightButton]}
+              onPress={() => handleToggleLight(request.roomId)}
+            >
+              <Ionicons 
+                name={lightStatuses[request.roomId] === 'on' ? 'bulb' : 'bulb-outline'} 
+                size={20} 
+                color={lightStatuses[request.roomId] === 'on' ? '#2e7d32' : '#666'} 
+              />
+              <Text style={[
+                styles.actionButtonText,
+                lightStatuses[request.roomId] === 'on' ? styles.lightOnText : styles.lightOffText
+              ]}>
+                {lightStatuses[request.roomId] === 'on' ? 'Включено' : 'Выключено'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     );
-  }
+  };
 
   return (
-    <FlatList
-      data={rooms}
-      renderItem={renderRoom}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.list}
-      showsVerticalScrollIndicator={false}
-    />
+    <SafeAreaView style={{flex:1, backgroundColor:'#fff', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 32 : 16}}>
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>
+            {user.role === 'cleaner' ? 'Задания на уборку' : 'Запросы на уборку'}
+          </Text>
+        </View>
+
+        {filteredRequests.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              {user.role === 'cleaner' ? 'У вас нет заданий на уборку' : 'У вас нет запросов на уборку'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.requestsList}>
+            {filteredRequests.map((request) => (
+              <View key={request.id} style={styles.requestCard}>
+                <View style={styles.requestHeader}>
+                  <Text style={styles.requestType}>
+                    {request.requestType === 'urgent' ? 'Срочная уборка' : 'Обычная уборка'}
+                  </Text>
+                  <Text style={[
+                    styles.requestStatus,
+                    request.status === 'completed' && styles.statusCompleted,
+                    request.status === 'pending' && styles.statusPending,
+                    request.status === 'approved' && styles.statusApproved,
+                    request.status === 'rejected' && styles.statusRejected,
+                  ]}>
+                    {request.status === 'completed' && 'Выполнено'}
+                    {request.status === 'pending' && 'Ожидает'}
+                    {request.status === 'approved' && 'Одобрено'}
+                    {request.status === 'rejected' && 'Отклонено'}
+                  </Text>
+                </View>
+
+                {request.notes && (
+                  <Text style={styles.requestNotes}>{request.notes}</Text>
+                )}
+
+                <Text style={styles.requestDate}>
+                  Создано: {new Date(request.createdAt).toLocaleDateString()}
+                </Text>
+
+                {getStatusActions(request)}
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -215,166 +307,151 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  list: {
+  header: {
     padding: 16,
-  },
-  roomCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    overflow: 'hidden',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  occupiedRoom: {
-    backgroundColor: '#000',
-  },
-  roomImage: {
-    width: '100%',
-    height: 200,
-    backgroundColor: '#f0f0f0',
-  },
-  placeholderImage: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  roomContent: {
-    padding: 20,
-  },
-  roomHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  roomInfo: {
-    flex: 1,
-  },
-  roomNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  roomDetails: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  priceContainer: {
-    alignItems: 'flex-end',
-  },
-  price: {
+  title: {
     fontSize: 20,
     fontWeight: 'bold',
   },
-  priceLabel: {
-    fontSize: 12,
-    color: '#666',
-  },
-  description: {
-    fontSize: 14,
-    color: '#666',
+  message: {
+    fontSize: 16,
+    textAlign: 'center',
     marginBottom: 16,
-    lineHeight: 20,
+    padding: 16,
   },
-  additionalInfo: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
-  },
-  infoItem: {
-    flexDirection: 'row',
+  loginButton: {
+    backgroundColor: '#000',
+    padding: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    gap: 4,
+    marginHorizontal: 16,
   },
-  infoText: {
-    fontSize: 14,
+  loginButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  emptyText: {
+    fontSize: 16,
     color: '#666',
+    textAlign: 'center',
   },
-  amenities: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
+  requestsList: {
+    padding: 16,
   },
-  amenityBadge: {
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+  requestCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  amenityText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  cleaningStatus: {
+  requestHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  guestInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  requestType: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  guestText: {
+  requestStatus: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  statusCompleted: {
+    color: '#2e7d32',
+  },
+  statusPending: {
+    color: '#f57c00',
+  },
+  statusApproved: {
+    color: '#1976d2',
+  },
+  statusRejected: {
+    color: '#d32f2f',
+  },
+  requestNotes: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 8,
   },
-  textWhite: {
-    color: '#fff',
+  requestDate: {
+    fontSize: 12,
+    color: '#999',
   },
-  emptyContainer: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#666',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#d32f2f',
-    textAlign: 'center',
-    padding: 16,
-  },
-  roomFeatures: {
+  actionButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
+    gap: 8,
+    marginTop: 12,
   },
-  featureItem: {
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    padding: 8,
+    borderRadius: 4,
+    flex: 1,
+    minWidth: '45%',
+    justifyContent: 'center',
   },
-  featureText: {
-    fontSize: 12,
+  actionButtonText: {
+    marginLeft: 4,
+    fontSize: 14,
+  },
+  approveButton: {
+    backgroundColor: '#e8f5e9',
+  },
+  approveButtonText: {
+    color: '#2e7d32',
+  },
+  rejectButton: {
+    backgroundColor: '#ffebee',
+  },
+  rejectButtonText: {
+    color: '#d32f2f',
+  },
+  completeButton: {
+    backgroundColor: '#e3f2fd',
+  },
+  completeButtonText: {
+    color: '#1976d2',
+  },
+  doorLockedButton: {
+    backgroundColor: '#fff3e0',
+  },
+  doorUnlockedButton: {
+    backgroundColor: '#e8f5e9',
+  },
+  doorLockedText: {
     color: '#666',
   },
-});
+  doorUnlockedText: {
+    color: '#2e7d32',
+  },
+  lightButton: {
+    backgroundColor: '#f3e5f5',
+  },
+  lightOnText: {
+    color: '#2e7d32',
+  },
+  lightOffText: {
+    color: '#666',
+  },
+}); 

@@ -36,13 +36,6 @@ export default function CleanerLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Задачи',
-          tabBarIcon: (props) => <Ionicons name="list-outline" {...props} />,
-        }}
-      />
-      <Tabs.Screen
-        name="cleaning"
-        options={{
           title: 'Расписание',
           tabBarIcon: (props) => <Ionicons name="calendar-outline" {...props} />,
         }}
@@ -54,6 +47,12 @@ export default function CleanerLayout() {
           tabBarIcon: (props) => <Ionicons name="settings-outline" {...props} />,
         }}
       />
+                <Tabs.Screen
+            name="room-service"
+            options={{
+              tabBarIcon: (props) => <Ionicons name="restaurant-outline" {...props} />,
+            }}
+          />
     </Tabs>
   );
 } 

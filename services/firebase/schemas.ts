@@ -12,17 +12,33 @@ const collections = {
       name: 'string',
       phone: 'string?',
       settings: {
-        pushNotifications: 'boolean',
-        emailNotifications: 'boolean',
         soundEnabled: 'boolean'
       },
-      pushToken: 'string?',
       createdAt: 'timestamp',
       updatedAt: 'timestamp'
     },
     indexes: [
       { fields: ['email'], type: 'ascending' },
       { fields: ['role'], type: 'ascending' }
+    ]
+  },
+  menuItems: {
+    fields: {
+      id: 'string',
+      name: 'string',
+      description: 'string',
+      price: 'number',
+      category: 'string',
+      imageUrl: 'string?',
+      isAvailable: 'boolean',
+      preparationTime: 'number',
+      createdAt: 'timestamp',
+      updatedAt: 'timestamp'
+    },
+    indexes: [
+      { fields: ['category'], type: 'ascending' },
+      { fields: ['isAvailable'], type: 'ascending' },
+      { fields: ['price'], type: 'ascending' }
     ]
   },
   rooms: {

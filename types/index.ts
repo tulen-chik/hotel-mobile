@@ -7,7 +7,7 @@ export type User = {
   uid: string;
   email: string;
   name: string;
-  role: 'admin' | 'cleaner' | 'user';
+  role: 'admin' | 'cleaner' | 'user' | 'repairer';
   settings: UserSettings;
   phone?: string;
   createdAt?: string;

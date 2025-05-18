@@ -17,6 +17,7 @@ interface AuthContextType {
   onAuthStateChanged: (callback: (user: User | null) => void) => void;
   isAdmin: boolean;
   isCleaner: boolean;
+  isRepairer: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -212,6 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     onAuthStateChanged,
     isAdmin: user?.role === 'admin',
     isCleaner: user?.role === 'cleaner',
+    isRepairer: user?.role === 'repairer',
   };
 
   if (!initialized || loading) {

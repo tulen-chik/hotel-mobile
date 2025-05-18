@@ -54,6 +54,13 @@ export default function UserLayout() {
           tabBarIcon: (props) => <Ionicons name="settings-outline" {...props} />,
         }}
       />
+            <Tabs.Screen
+        name="menu"
+        options={{
+          title: 'Меню',
+          tabBarIcon: (props) => <Ionicons name="restaurant-outline" {...props} />,
+        }}
+      />
     </Tabs>
   );
 } 

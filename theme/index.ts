@@ -30,7 +30,6 @@ export const theme = {
     disabled: '#999999',
     placeholder: '#999999',
     backdrop: 'rgba(0, 0, 0, 0.5)',
-    notification: '#FF0000',
     // Custom colors
     border: '#E0E0E0',
     success: '#00C853',

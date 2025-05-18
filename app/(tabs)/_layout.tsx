@@ -4,7 +4,7 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 
 type TabIconProps = {
-  name: 'bed-outline' | 'calendar-outline' | 'person-outline' | 'settings-outline' | 'water-outline';
+  name: 'bed-outline' | 'calendar-outline' | 'person-outline' | 'settings-outline' | 'water-outline' | 'restaurant-outline';
   color: string;
   size: number;
 };
@@ -34,28 +34,20 @@ export default function TabLayout() {
         tabBarShowLabel: false,
       }}
     >
+            <Tabs.Screen
+        name="reservations"
+        options={{
+          title: 'Бронирования',
+          tabBarIcon: (props) => <Ionicons name="calendar-outline" {...props} />,
+        }}
+      />
       <Tabs.Screen
         name="index"
         options={{
           tabBarIcon: (props) => <TabIcon name="bed-outline" {...props} />,
         }}
       />
-      {!isCleaner && (
-        <Tabs.Screen
-          name="reservations"
-          options={{
-            tabBarIcon: (props) => <TabIcon name="calendar-outline" {...props} />,
-          }}
-        />
-      )}
-      {isCleaner && (
-        <Tabs.Screen
-          name="cleaning"
-          options={{
-            tabBarIcon: (props) => <TabIcon name="water-outline" {...props} />,
-          }}
-        />
-      )}
+
       <Tabs.Screen
         name="settings"
         options={{

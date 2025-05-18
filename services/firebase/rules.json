@@ -1,0 +1,53 @@
+{
+  "rules": {
+    "menuItems": {
+      ".indexOn": ["category", "isAvailable", "price"],
+      "$menuId": {
+        ".read": true,
+        ".write": "auth != null && (auth.token.role === 'admin' || auth.token.role === 'manager')"
+      }
+    },
+    "roomServiceOrders": {
+      ".indexOn": ["userId", "roomId", "status", "createdAt"],
+      "$orderId": {
+        ".read": "auth != null && (auth.uid === data.child('userId').val() || auth.token.role === 'admin' || auth.token.role === 'manager')",
+        ".write": "auth != null && (auth.uid === data.child('userId').val() || auth.token.role === 'admin' || auth.token.role === 'manager')"
+      }
+    },
+    "users": {
+      ".indexOn": ["email", "role"],
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.role === 'admin')",
+        ".write": "auth != null && (auth.uid === $userId || auth.token.role === 'admin')"
+      }
+    },
+    "rooms": {
+      ".indexOn": ["isOccupied", "number", "doorStatus", "cleaningStatus"],
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.token.role === 'admin' || auth.token.role === 'manager')"
+      }
+    },
+    "cleaning_requests": {
+      ".indexOn": ["status", "createdAt", "roomId", "userId", "assignedTo"],
+      "$requestId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.token.role === 'admin' || auth.token.role === 'manager' || auth.token.role === 'cleaner')"
+      }
+    },
+    "cleaning_records": {
+      ".indexOn": ["roomId", "cleanedAt", "cleanerId"],
+      "$recordId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.token.role === 'admin' || auth.token.role === 'manager' || auth.token.role === 'cleaner')"
+      }
+    },
+    "reservations": {
+      ".indexOn": ["userId", "createdAt", "roomId", "checkIn"],
+      "$reservationId": {
+        ".read": "auth != null && (auth.uid === data.child('userId').val() || auth.token.role === 'admin' || auth.token.role === 'manager')",
+        ".write": "auth != null && (auth.uid === data.child('userId').val() || auth.token.role === 'admin' || auth.token.role === 'manager')"
+      }
+    }
+  }
+} 

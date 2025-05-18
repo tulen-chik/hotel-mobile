@@ -2,11 +2,139 @@ import { useRooms } from '@/contexts/RoomContext';
 import { Room } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Dimensions, FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
+
+interface Message {
+  id: string;
+  text: string;
+  from: 'user' | 'bot';
+}
+
+const quickReplies = [
+  { label: 'Заказать номер', value: 'Я хочу заказать номер' },
+  { label: 'Связаться с поддержкой', value: 'Связаться с поддержкой' },
+  { label: 'Цены', value: 'Какие цены?' },
+];
+
+interface DeepSeekModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onOpen: () => void;
+}
+
+function DeepSeekModal({ visible, onClose, onOpen }: DeepSeekModalProps) {
+  const [messages, setMessages] = useState<Message[]>([
+    { id: '1', text: 'Здравствуйте! Чем могу помочь?', from: 'bot' }
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const DEEPSEEK_API_KEY = 'sk-0f39de11eefe408c9c9600489ce34a86';
+
+  const sendMessage = async (msg?: string) => {
+    const text = msg ?? input;
+    if (!text.trim()) return;
+    const userMsg: Message = { id: Date.now().toString(), text, from: 'user' };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
+
+    try {
+      const res = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [
+            { role: 'system', content: 'You are a helpful assistant.' },
+            { role: 'user', content: text }
+          ],
+          stream: false
+        }),
+      });
+      const data = await res.json();
+      setMessages(prev => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), text: data.choices?.[0]?.message?.content || 'Нет ответа', from: 'bot' }
+      ]);
+    } catch (e) {
+      setMessages(prev => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), text: 'Ошибка связи с поддержкой.', from: 'bot' }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!visible) {
+    return (
+      <TouchableOpacity style={styles.fab} onPress={onOpen} activeOpacity={0.8}>
+        <Text style={styles.fabText}>💬</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View style={styles.overlay} pointerEvents="box-none">
+      <View style={styles.modal}>
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Text style={styles.closeText}>×</Text>
+        </TouchableOpacity>
+        <FlatList
+          data={messages}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <View style={[styles.message, item.from === 'user' ? styles.user : styles.bot]}>
+              <Text style={styles.text}>{item.text}</Text>
+            </View>
+          )}
+          style={styles.list}
+          contentContainerStyle={{ paddingVertical: 8 }}
+        />
+        <View style={styles.quickReplies}>
+          {quickReplies.map(qr => (
+            <TouchableOpacity
+              key={qr.value}
+              style={styles.quickReplyButton}
+              onPress={() => sendMessage(qr.value)}
+              disabled={loading}
+            >
+              <Text style={styles.quickReplyText}>{qr.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Введите сообщение..."
+            editable={!loading}
+          />
+          <TouchableOpacity onPress={() => sendMessage()} style={styles.sendButton} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Отправить</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export default function RoomsScreen() {
   const { rooms, loading, error } = useRooms();
   const router = useRouter();
+  const [isChatVisible, setIsChatVisible] = useState(false);
 
   const renderRoom = ({ item }: { item: Room }) => {
     return (
@@ -201,13 +329,20 @@ export default function RoomsScreen() {
   }
 
   return (
-    <FlatList
-      data={rooms}
-      renderItem={renderRoom}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.list}
-      showsVerticalScrollIndicator={false}
-    />
+    <View style={styles.container}>
+      <FlatList
+        data={rooms}
+        renderItem={renderRoom}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+      />
+      <DeepSeekModal
+        visible={isChatVisible}
+        onClose={() => setIsChatVisible(false)}
+        onOpen={() => setIsChatVisible(true)}
+      />
+    </View>
   );
 }
 
@@ -217,9 +352,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  list: {
-    padding: 16,
   },
   roomCard: {
     backgroundColor: '#fff',
@@ -376,5 +508,119 @@ const styles = StyleSheet.create({
   featureText: {
     fontSize: 12,
     color: '#666',
+  },
+  overlay: {
+    position: 'absolute',
+    bottom: 24,
+    right: 6,
+    zIndex: 1000,
+    width: width * 0.9,
+    maxWidth: 300,
+    alignItems: 'flex-end',
+  },
+  modal: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    width: 300,
+    maxHeight: 420,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 10,
+    padding: 4,
+  },
+  closeText: {
+    fontSize: 24,
+    color: '#6200EA',
+    fontWeight: 'bold',
+  },
+  list: { 
+    flexGrow: 0, 
+    marginBottom: 8, 
+    marginTop: 28 
+  },
+  message: { 
+    padding: 10, 
+    borderRadius: 8, 
+    marginVertical: 4, 
+    maxWidth: '80%' 
+  },
+  user: { 
+    alignSelf: 'flex-end', 
+    backgroundColor: '#e1d7f3' 
+  },
+  bot: { 
+    alignSelf: 'flex-start', 
+    backgroundColor: '#f1f1f1' 
+  },
+  text: { 
+    fontSize: 15 
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginRight: 2,
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 8,
+    marginHorizontal: 2,
+  },
+  sendButton: {
+    backgroundColor: '#6200EA',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  quickReplies: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    marginBottom: 8, 
+    gap: 8 
+  },
+  quickReplyButton: { 
+    backgroundColor: '#eee', 
+    borderRadius: 16, 
+    paddingVertical: 6, 
+    paddingHorizontal: 14, 
+    marginRight: 8, 
+    marginBottom: 4 
+  },
+  quickReplyText: { 
+    color: '#6200EA', 
+    fontWeight: 'bold' 
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 65,
+    right: 12,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#6200EA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  fabText: {
+    color: '#fff',
+    fontSize: 28,
+    fontWeight: 'bold',
+    lineHeight: 32,
   },
 });
